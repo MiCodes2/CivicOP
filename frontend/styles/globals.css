@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* Theme color defaults */
+  --theme-city: #F9A825;
+  --theme-water: #3B99D9;
+  --theme-transport: #D32F2F;
+  --theme-greenspace: #388E3C;
+  --theme-bg: #FFFFFF;
+}
+
+/* Leaflet CSS */
+@import 'https://unpkg.com/leaflet@1.7.1/dist/leaflet.css';
+
+/* Custom styles for the map */
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  z-index: 1;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 8px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+}
