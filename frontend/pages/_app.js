@@ -60,7 +60,7 @@ export default function App({ Component, pageProps }) {
           </div>
           
           {/* 2. Middle Content (Takes remaining space) */}
-          <div className="flex flex-1 overflow-hidden relative">
+          <div className="flex overflow-hidden relative" style={{ height: 'calc(100vh - var(--app-header-height) - var(--app-footer-height) - 8px)' }} >
             
             {/* Sidebar (Scrolls independently if needed) */}
             <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col shrink-0 overflow-y-auto no-scrollbar z-40">

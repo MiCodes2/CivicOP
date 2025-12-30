@@ -23,7 +23,7 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
   // 2. If small is true, use fixed widget sizes.
   // 3. Otherwise default to a fixed height.
   const sizeClass = fillHeight 
-    ? 'h-full min-h-[400px]' 
+    ? 'h-full' 
     : (small ? "h-[246px] md:h-[461px]" : 'h-96 md:h-[600px]');
 
   useEffect(() => {

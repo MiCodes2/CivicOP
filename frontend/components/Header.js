@@ -8,16 +8,10 @@ export default function Header() {
 
   return (
     <header className="bg-white shadow-sm border-b" style={{ height: 'var(--app-header-height)' }}>
-      {/* Changes made here:
-        1. Removed 'max-w-7xl mx-auto' (which limited width).
-        2. Added 'w-full' to stretch full width.
-        3. Added 'px-4 md:px-[1in]' to create the 1-inch margin on desktop (approx 96px) 
-           and safe padding on mobile.
-      */}
       <div className="w-full h-full flex items-center justify-between px-4 md:px-[1in]">
         
-        {/* LEFT ALIGN: Logo & App Name */}
-        <div className="flex items-center">
+        {/* LEFT: Logo & App Name */}
+        <div className="flex items-center shrink-0">
           <Link href="/" className="flex items-center space-x-1">
             <Image
               src="/CivicOP_logo.png"
@@ -36,32 +30,49 @@ export default function Header() {
           </Link>
         </div>
 
-        {/* CENTER: Governance Title (Conditional) */}
-        {/* Kept this to preserve layout balance. If visible, it stays centered. If hidden, empty div takes no space. */}
-        <div className="flex-1 flex justify-center">
-          {isGovernance && (
+        {/* CENTER: Dynamic Content */}
+        {/* Added 'px-8' to ensure it doesn't touch the logo or buttons */}
+        <div className="flex-1 flex justify-center px-8">
+          
+          {isGovernance ? (
+            // CASE A: Governance Dashboard Title
             <div className="text-center bg-water/10 px-4 py-2 rounded-md shadow-sm hidden md:block">
               <h2 className="font-bold text-water text-lg md:text-xl">Governance</h2>
               <p className="text-xs text-water/80">Governance Dashboard</p>
             </div>
+          ) : (
+            // CASE B: Home Page Search Bar (NEW)
+            // Only visible on Desktop (hidden md:flex) to save space on mobile
+            <div className="hidden md:flex w-full max-w-md relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                {/* Search Icon */}
+                <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:border-water focus:ring-1 focus:ring-water sm:text-sm transition duration-150 ease-in-out"
+                placeholder="Search for wards, issues, or locations..."
+              />
+            </div>
           )}
         </div>
 
-        {/* RIGHT ALIGN: Buttons */}
-        {/* Removed inline style={{ marginRight: '1in' }} as the parent padding handles it now */}
-        <div className="flex items-center space-x-4">
+        {/* RIGHT: Buttons */}
+        <div className="flex items-center space-x-3 shrink-0">
           {!isGovernance && (
             <>
-              <Link href="/governance" className="hidden md:inline-block bg-water hover:bg-water/90 text-white font-medium py-2 px-4 rounded-lg shadow-sm">
+              <Link href="/governance" className="hidden lg:inline-block bg-water hover:bg-water/90 text-white font-medium py-2 px-4 rounded-lg shadow-sm whitespace-nowrap">
                 Civic Governance Hub
               </Link>
-              <Link href="/" className="hidden md:inline-block bg-city hover:bg-city/90 text-white font-medium py-2 px-4 rounded-lg shadow-sm transition duration-200">
+              <Link href="/" className="hidden md:inline-block bg-city hover:bg-city/90 text-white font-medium py-2 px-4 rounded-lg shadow-sm transition duration-200 whitespace-nowrap">
                 Report Issue
               </Link>
             </>
           )}
 
-          <Link href="/login" className="bg-greenspace hover:bg-greenspace/90 text-white font-medium py-2 px-4 rounded-lg shadow-sm">
+          <Link href="/login" className="bg-greenspace hover:bg-greenspace/90 text-white font-medium py-2 px-4 rounded-lg shadow-sm whitespace-nowrap">
             Login
           </Link>
         </div>
