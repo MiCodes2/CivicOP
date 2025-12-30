@@ -1,18 +1,30 @@
 export default function Footer() {
   return (
-    <footer className="mt-auto" style={{backgroundColor: 'var(--theme-water)', color: 'white'}}>
-      {/* Top accent subtle gradient (re-using brand colors) */}
-      <div style={{height: 6, background: 'linear-gradient(90deg, var(--theme-city), var(--theme-water), var(--theme-transport), var(--theme-greenspace))'}} />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col md:flex-row justify-between items-center">
-        <div className="flex items-center space-x-3 mb-4 md:mb-0">
+    <footer 
+      className="mt-auto flex flex-col w-full" 
+      style={{
+        backgroundColor: 'var(--theme-water)', 
+        color: 'white', 
+        // FIX: Removed 'minHeight' so the footer can actually shrink to fit the smaller padding
+        marginBottom: 0, 
+        borderTop: 'none'
+      }}
+    >
+      {/* Top accent bar */}
+      <div style={{height: 8, flexShrink: 0, background: 'linear-gradient(90deg, var(--theme-city), var(--theme-water), var(--theme-transport), var(--theme-greenspace))'}} />
+      
+      {/* FIX: Reduced 'py-6' to 'py-3' to tighten the vertical space */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col md:flex-row justify-between items-center w-full flex-1">
+        <div className="flex items-center space-x-3 mb-2 md:mb-0">
+          {/* Optional: You can reduce logo size to w-8 h-8 if you want it even smaller */}
           <img src="/CivicOP_logo.png" alt="CivicOP" className="w-10 h-10 rounded object-contain" />
           <div>
-            <div className="font-semibold">CivicOP</div>
-            <div className="text-sm text-white/90">Civic Operation of India</div>
+            <div className="font-semibold leading-tight">CivicOP</div>
+            <div className="text-xs text-white/90">Civic Operation of India</div>
           </div>
         </div>
 
-        <div className="flex items-center space-x-6">
+        <div className="flex items-center space-x-6 text-sm">
           <a href="/" className="text-white hover:underline">Home</a>
           <a href="/governance" className="text-white hover:underline">Governance</a>
           <a href="/login" className="text-white hover:underline">Login</a>

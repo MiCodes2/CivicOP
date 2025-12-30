@@ -6,7 +6,7 @@ import Link from 'next/link';
 // Dynamically import map to avoid SSR issues
 const DynamicMap = dynamic(() => import('../components/Map'), {
   ssr: false,
-  loading: () => <div className="h-96 bg-gray-200 rounded-lg flex items-center justify-center">Loading map...</div>
+  loading: () => <div className="h-[246px] bg-gray-200 rounded-lg flex items-center justify-center">Loading map...</div>
 });
 
 // Dynamic import for modal map
@@ -72,22 +72,22 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--theme-bg)' }}>
-      <main className="flex gap-6">
-        <section className="flex-1 px-6 pb-8">
-          <div className="px-4 py-6 sm:px-0 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-screen-2xl mx-auto">
+      <main className="flex flex-1 gap-6 overflow-hidden">
+        <section className="flex-1 px-6 pb-4 min-h-0">
+          <div className="px-4 py-0 sm:px-0 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-screen-2xl mx-auto h-full min-h-0">
           {/* Map Section */}
-          <div className="bg-white rounded-lg shadow-sm border mb-6 md:col-span-2 w-full">
-            <div className="p-4 border-b">
+          <div className="bg-white rounded-lg shadow-sm border mb-6 md:col-span-2 w-full flex flex-col">
+            <div className="px-4 border-b">
               <h2 className="text-lg font-semibold text-gray-900">Nearby Issues</h2>
               <p className="text-sm text-gray-600">Click on markers to view details</p>
             </div>
-            <div className="p-4">
-              <DynamicMap incidents={incidents} userLocation={userLocation} />
+            <div className="flex-1 min-h-0">
+              <DynamicMap incidents={incidents} userLocation={userLocation} fillHeight small />
             </div>
           </div>
 
           {/* Recent Incidents List */}
-          <div className="bg-white rounded-lg shadow-sm border md:col-span-1 w-full">
+          <div className="bg-white rounded-lg shadow-sm border md:col-span-1 w-full max-h-[70vh] overflow-auto">
             <div className="p-4 border-b">
               <h3 className="text-lg font-semibold text-gray-900">Recent Reports</h3>
             </div>

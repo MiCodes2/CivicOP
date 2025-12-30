@@ -27,6 +27,15 @@ html, body {
   z-index: 1;
 }
 
+/* Utility: hide native scrollbars while keeping content scrollable */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
+}
+
 .leaflet-popup-content-wrapper {
   border-radius: 8px !important;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;

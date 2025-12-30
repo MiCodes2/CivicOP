@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
+import Link from 'next/link';
 
 // ----------------------------------------------------------------------
 // 1. DYNAMIC MAP LOADING
@@ -20,7 +22,7 @@ const DynamicMap = dynamic(() => import('../components/Map'), {
 });
 
 // ----------------------------------------------------------------------
-// 2. MAIN LAYOUT (TOP NAV + FULL WIDTH APP SHELL)
+// 2. MAIN LAYOUT (FULL SCREEN OVERLAY)
 // ----------------------------------------------------------------------
 export default function GovernanceDashboard() {
   const [activeNav, setActiveNav] = useState('dashboard');
@@ -33,33 +35,43 @@ export default function GovernanceDashboard() {
   });
 
   return (
-    // ROOT: Full viewport, no window scroll
-    <div className="flex flex-col h-screen w-full bg-gray-50 overflow-hidden font-sans text-gray-900">
+    // FIX APPLIED HERE: 
+    // 'fixed inset-0 z-50' forces this component to cover the ENTIRE viewport, 
+    // hiding any sidebar/header coming from your _app.js or parent layout.
+    <div className="fixed inset-0 z-50 flex flex-col bg-gray-50 overflow-hidden font-sans text-gray-900">
       
       {/* A. GLOBAL HEADER (Replaces Sidebar) */}
-      <header className="h-14 bg-white border-b border-gray-200 flex items-center px-4 justify-between shrink-0 z-30 shadow-sm relative">
+      <header className="h-14 bg-white border-b border-gray-200 flex items-center pl-2 pr-4 justify-between shrink-0 z-30 shadow-sm relative">
          {/* Left: Brand & Navigation */}
          <div className="flex items-center space-x-6">
             {/* Brand */}
-            <div className="flex items-center space-x-3">
-               <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center text-white font-bold shadow-sm">
-                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-               </div>
-               <div>
+            <div className="flex items-center space-x-3 pl-2">
+               <Image src="/CivicOP_logo.png" alt="CivicOP Logo" width={36} height={36} className="rounded object-contain" />
+               <div className="flex items-center space-x-2">
                  <span className="block font-bold text-gray-800 text-lg leading-tight tracking-tight">CivicOP</span>
+                 <Link href="/" legacyBehavior><a className="ml-2 text-gray-500 hover:text-gray-700" title="Home" aria-label="Home">
+                   <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10.5L12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V10.5z"/></svg>
+                 </a></Link>
+               
+               {/* space reserved for page title to the right of tabs */}
                </div>
             </div>
 
             {/* Divider */}
-            <div className="h-6 w-px bg-gray-200"></div>
+            <div className="h-6 w-px bg-gray-200 mx-4"></div>
 
             {/* Top Navigation Tabs */}
-            <nav className="flex space-x-1">
+            <nav className="flex space-x-1 ml-4">
                <NavTab label="Dashboard" icon="📊" active={activeNav === 'dashboard'} onClick={() => setActiveNav('dashboard')} />
                <NavTab label="Map View" icon="🗺️" active={activeNav === 'map'} onClick={() => setActiveNav('map')} />
                <NavTab label="Workflow Triage" icon="🎫" active={activeNav === 'tickets' || activeNav === 'ai'} onClick={() => setActiveNav('tickets')} />
                <NavTab label="Predictive & IoT" icon="📡" active={activeNav === 'iot'} onClick={() => setActiveNav('iot')} />
             </nav>
+
+            {/* Prominent page title placed to the right of the tabs */}
+            <div className="ml-8 md:ml-12 hidden sm:flex items-center">
+              <h1 className="text-blue-700 font-extrabold text-lg md:text-xl tracking-tight">Civic Governance Hub</h1>
+            </div>
          </div>
          
          {/* Right: Context & User */}
@@ -171,8 +183,8 @@ function DashboardView() {
         </div>
 
         {/* Map Canvas */}
-        <div className="flex-1 relative bg-gray-100">
-          <DynamicMap incidents={[]} userLocation={null} />
+        <div className="flex-1 relative bg-gray-100 min-h-0">
+          <DynamicMap incidents={[]} userLocation={null} fillHeight />
           
           {/* Floating Overlays */}
           <div className="absolute top-4 left-4 bg-white/95 backdrop-blur rounded-lg shadow-lg border border-gray-100 p-3 min-w-[140px]">
@@ -524,8 +536,8 @@ function MapView() {
               <h2 className="font-semibold text-gray-800 text-sm">Full Intelligence Map</h2>
               <button className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 shadow-sm">Export GIS Data</button>
            </div>
-           <div className="flex-1 bg-gray-50 relative">
-               <DynamicMap incidents={[]} userLocation={null} />
+           <div className="flex-1 bg-gray-50 relative min-h-0">
+               <DynamicMap incidents={[]} userLocation={null} fillHeight />
            </div>
         </div>
     )

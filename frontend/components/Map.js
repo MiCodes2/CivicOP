@@ -4,15 +4,27 @@ import 'leaflet/dist/leaflet.css';
 
 // Fix for default markers in Leaflet with Next.js
 import L from 'leaflet';
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
 
-const Map = ({ incidents, userLocation }) => {
-  const [center, setCenter] = useState([12.9716, 77.5946]); // Default to Bengaluru, India
+// Only run this on client side to avoid build errors
+if (typeof window !== 'undefined') {
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    });
+}
+
+const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => {
+  const [center, setCenter] = useState([12.9716, 77.5946]); // Default to Bengaluru
+
+  // === HEIGHT LOGIC ===
+  // 1. If fillHeight is true (passed from App.js), use 'h-full' to fill the flex container exactly.
+  // 2. If small is true, use fixed widget sizes.
+  // 3. Otherwise default to a fixed height.
+  const sizeClass = fillHeight 
+    ? 'h-full min-h-[400px]' 
+    : (small ? "h-[246px] md:h-[461px]" : 'h-96 md:h-[600px]');
 
   useEffect(() => {
     if (userLocation) {
@@ -27,25 +39,18 @@ const Map = ({ incidents, userLocation }) => {
 
   const getMarkerColor = (status) => {
     switch (status) {
-      case 'reported':
-        return THEME_CITY; // city / saffron
-      case 'processing':
-        return THEME_WATER; // water / blue
-      case 'verified':
-        return THEME_GREENSPACE; // verified -> green space
-      case 'assigned':
-        return THEME_TRANSPORT; // assigned -> transport (red)
-      case 'resolved':
-        return THEME_GREENSPACE; // resolved -> green
-      case 'rejected':
-        return THEME_TRANSPORT; // rejected -> transport (red)
-      default:
-        return '#6b7280'; // gray
+      case 'reported': return THEME_CITY; 
+      case 'processing': return THEME_WATER; 
+      case 'verified': return THEME_GREENSPACE; 
+      case 'assigned': return THEME_TRANSPORT; 
+      case 'resolved': return THEME_GREENSPACE; 
+      case 'rejected': return THEME_TRANSPORT; 
+      default: return '#6b7280'; 
     }
   };
 
   return (
-    <div className="relative h-96 w-full rounded-lg">
+    <div className={`relative ${sizeClass} w-full rounded-lg shadow-sm border border-gray-200 overflow-hidden`}>
       <MapContainer center={center} zoom={13} style={{ height: '100%', width: '100%' }}>
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -56,7 +61,7 @@ const Map = ({ incidents, userLocation }) => {
             <Popup>Your Location</Popup>
           </Marker>
         )}
-        {incidents.filter(i => Number.isFinite(i.latitude) && Number.isFinite(i.longitude)).map((incident) => {
+        {incidents && incidents.filter(i => Number.isFinite(i.latitude) && Number.isFinite(i.longitude)).map((incident) => {
           const markerColor = getMarkerColor(incident.status);
           const customIcon = L.divIcon({
             className: 'custom-marker',
@@ -73,16 +78,15 @@ const Map = ({ incidents, userLocation }) => {
             >
               <Popup>
                 <div className="p-2">
-                  <h3 className="font-semibold text-sm">{incident.category.charAt(0).toUpperCase() + incident.category.slice(1)} Issue</h3>
+                  <h3 className="font-semibold text-sm">{incident.category ? incident.category.charAt(0).toUpperCase() + incident.category.slice(1) : 'Issue'}</h3>
                   <p className="text-xs text-gray-600 mt-1">{incident.description || 'No description provided'}</p>
                   <div className="mt-2">
-                    <span className={`inline-block px-2 py-1 text-xs rounded-full ${
-                      incident.status === 'reported' ? 'bg-city/10 text-city' :
-                      incident.status === 'processing' ? 'bg-water/10 text-water' :
-                      incident.status === 'verified' ? 'bg-greenspace/10 text-greenspace' :
-                      incident.status === 'assigned' ? 'bg-transport/10 text-transport' :
-                      incident.status === 'resolved' ? 'bg-greenspace/10 text-greenspace' :
-                      'bg-transport/10 text-transport'
+                    <span className={`inline-block px-2 py-1 text-xs rounded-full border ${
+                      incident.status === 'reported' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                      incident.status === 'processing' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                      incident.status === 'verified' ? 'bg-green-50 text-green-700 border-green-200' :
+                      incident.status === 'assigned' ? 'bg-red-50 text-red-700 border-red-200' :
+                      'bg-gray-100 text-gray-700 border-gray-200'
                     }`}>
                       {incident.status}
                     </span>
