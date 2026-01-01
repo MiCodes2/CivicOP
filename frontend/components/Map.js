@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // Fix for default markers in Leaflet with Next.js
@@ -17,20 +17,51 @@ if (typeof window !== 'undefined') {
 
 const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => {
   const [center, setCenter] = useState([12.9716, 77.5946]); // Default to Bengaluru
+  const [detectedLocation, setDetectedLocation] = useState(null);
 
   // === HEIGHT LOGIC ===
   // 1. If fillHeight is true (passed from App.js), use 'h-full' to fill the flex container exactly.
-  // 2. If small is true, use fixed widget sizes.
-  // 3. Otherwise default to a fixed height.
+  // 2. If small is true, use fixed widget sizes (increased slightly).
+  // 3. Otherwise default to a larger fixed height (increased slightly).
   const sizeClass = fillHeight 
     ? 'h-full' 
-    : (small ? "h-[246px] md:h-[461px]" : 'h-96 md:h-[600px]');
+    : (small ? "h-[411px] md:h-[771px]" : 'h-[643px] md:h-[1004px]');
 
+  // If a userLocation prop is passed, prefer it. Otherwise attempt to detect via browser geolocation.
   useEffect(() => {
-    if (userLocation) {
-      setCenter([userLocation.latitude, userLocation.longitude]);
+    if (userLocation && userLocation.latitude && userLocation.longitude) {
+      const loc = [userLocation.latitude, userLocation.longitude];
+      setCenter(loc);
+      setDetectedLocation(loc);
+      return;
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const loc = [pos.coords.latitude, pos.coords.longitude];
+          setCenter(loc);
+          setDetectedLocation(loc);
+        },
+        (err) => {
+          // permission denied or error — keep default center
+          console.warn('Geolocation error:', err);
+        },
+        { enableHighAccuracy: true, maximumAge: 60 * 1000 }
+      );
     }
   }, [userLocation]);
+
+  // Small helper to programmatically recenter the map when the center state updates
+  function Recenter({ position }) {
+    const map = useMap();
+    useEffect(() => {
+      if (position && map) {
+        map.setView(position, map.getZoom());
+      }
+    }, [position]);
+    return null;
+  }
 
   const THEME_CITY = process.env.NEXT_PUBLIC_THEME_CITY || '#F9A825';
   const THEME_WATER = process.env.NEXT_PUBLIC_THEME_WATER || '#3B99D9';
@@ -56,9 +87,19 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='© OpenStreetMap contributors'
         />
-        {userLocation && (
-          <Marker position={[userLocation.latitude, userLocation.longitude]}>
-            <Popup>Your Location</Popup>
+        <Recenter position={center} />
+        {center && (
+          <Marker
+            position={center}
+            icon={L.divIcon({
+              className: 'user-location',
+              html: `<div class="user-location-pin"></div>`,
+              iconSize: [24, 36],
+              iconAnchor: [12, 36],
+            })}
+            zIndexOffset={2000}
+          >
+            <Popup>You are here</Popup>
           </Marker>
         )}
         {incidents && incidents.filter(i => Number.isFinite(i.latitude) && Number.isFinite(i.longitude)).map((incident) => {
@@ -97,6 +138,7 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
           );
         })}
       </MapContainer>
+
       <style jsx>{`
         .custom-marker {
           display: flex;
@@ -109,6 +151,29 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
         }
         .leaflet-popup-content {
           margin: 0;
+        }
+
+        /* Floating blue pin for user location */
+        .user-location-pin {
+          position: relative;
+          width: 18px;
+          height: 18px;
+          background: var(--theme-water);
+          transform: rotate(-45deg);
+          border-radius: 50% 50% 50% 0;
+          border: 2px solid #ffffff;
+          box-shadow: 0 2px 8px rgba(59,153,217,0.35);
+        }
+        .user-location-pin::after {
+          content: '';
+          position: absolute;
+          left: 50%;
+          top: 42%;
+          transform: translate(-50%, -50%) rotate(45deg);
+          width: 8px;
+          height: 8px;
+          background: #ffffff;
+          border-radius: 50%;
         }
       `}</style>
     </div>

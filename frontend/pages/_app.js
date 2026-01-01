@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router'
 import React from 'react'
 import Head from 'next/head'
+import Link from 'next/link';
 import '../styles/globals.css'
 import 'leaflet/dist/leaflet.css'
 import Header from '../components/Header'
@@ -63,8 +64,8 @@ export default function App({ Component, pageProps }) {
           <div className="flex overflow-hidden relative" style={{ height: 'calc(100vh - var(--app-header-height) - var(--app-footer-height) - 8px)' }} >
             
             {/* Sidebar (Scrolls independently if needed) */}
-            <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col shrink-0 overflow-y-auto no-scrollbar z-40">
-               <div className="p-4 space-y-2">
+            <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col shrink-0 overflow-y-auto no-scrollbar z-40 pr-0">
+               <div className="pl-4 pr-0 pt-4 pb-4 space-y-2">
                   <NavButton icon="📊" label="Dashboard" />
                   <NavButton icon="🗺️" label="Map View" />
                   <NavButton icon="🎫" label="Tickets" />
@@ -75,7 +76,7 @@ export default function App({ Component, pageProps }) {
             
             {/* Main Content (Scrolls independently) */}
             {/* We pass 'fillHeight' prop to the child component */}
-            <main className="flex-1 w-full min-w-0 p-4 bg-gray-50/50 overflow-y-auto flex flex-col">
+            <main className="flex-1 w-full min-w-0 pl-0 pr-0 pb-0 bg-gray-50/50 overflow-y-auto flex flex-col">
               <Component {...pageProps} fillHeight={true} />
             </main>
           </div>
@@ -90,11 +91,19 @@ export default function App({ Component, pageProps }) {
   )
 }
 
+
+
 function NavButton({ icon, label }) {
+  const router = useRouter();
+  const slug = '/' + label.toLowerCase().replace(/\s+/g, '-');
+  const active = router.pathname === slug;
+
   return (
-    <button className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors font-medium">
-      <span className="text-xl">{icon}</span>
-      <span>{label}</span>
-    </button>
+    <Link href={slug} legacyBehavior>
+      <a className={`w-full flex items-center space-x-3 pl-4 pr-0 py-3 rounded-lg text-left transition-colors font-medium ${active ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-blue-50 hover:text-blue-700'}`}>
+        <span className="text-xl">{icon}</span>
+        <span>{label}</span>
+      </a>
+    </Link>
   );
 }

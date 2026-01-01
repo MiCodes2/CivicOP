@@ -6,13 +6,13 @@ import Link from 'next/link';
 // Dynamically import map to avoid SSR issues
 const DynamicMap = dynamic(() => import('../components/Map'), {
   ssr: false,
-  loading: () => <div className="h-[240px] md:h-[420px] bg-gray-200 rounded-lg flex items-center justify-center">Loading map...</div>
+  loading: () => <div className="h-[411px] md:h-[694px] bg-gray-200 rounded-lg flex items-center justify-center">Loading map...</div>
 });
 
 // Dynamic import for modal map
 const ModalMap = dynamic(() => import('./ModalMap'), {
   ssr: false,
-  loading: () => <div className="h-48 bg-gray-200 rounded-md flex items-center justify-center">Loading map...</div>
+  loading: () => <div className="h-[321px] bg-gray-200 rounded-md flex items-center justify-center">Loading map...</div>
 });
 
 import CameraOverlay from '../components/CameraOverlay';
@@ -72,18 +72,18 @@ export default function Home() {
 
   return (
     <div className="flex-1 flex flex-col h-full" style={{ backgroundColor: 'var(--theme-bg)' }}>
-      <main className="flex flex-1 gap-6 overflow-hidden h-full">
-        <section className="flex-1 px-6 pb-4 min-h-0 h-full">
-          <div className="px-4 py-0 sm:px-0 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-screen-2xl mx-auto h-full min-h-0">
+      <main className="flex flex-1 overflow-hidden h-full">
+        <section className="flex-1 pb-0 min-h-0 h-full">
+          <div className="py-0 pl-0 grid grid-cols-1 md:grid-cols-3 gap-3 w-full h-full min-h-0">
           {/* Map Section */}
           <div className="bg-white rounded-lg shadow-sm border mb-6 md:col-span-2 w-full self-start">
-            <div className="px-4 border-b">
-              <h2 className="text-lg font-semibold text-gray-900">Nearby Issues</h2>
+            <div className="px-4 pt-4 pb-2 border-b">
+              <h2 className="text-lg font-semibold text-gray-900 m-0">Nearby Issues</h2>
               <p className="text-sm text-gray-600">Click on markers to view details</p>
             </div>
-            <div className="p-4">
+          <div className="p-0 m-0">
               {/* Fixed rectangular map container (smaller rectangle) */}
-              <div className="h-[240px] md:h-[420px] rounded-md overflow-hidden">
+              <div className="h-[411px] md:h-[694px] w-full overflow-hidden rounded-none">
                 <DynamicMap incidents={incidents} userLocation={userLocation} fillHeight />
               </div>
             </div>
@@ -314,7 +314,7 @@ function ReportModal({ onClose, userLocation }) {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Location (click on map or enter coordinates)
             </label>
-            <div className="h-48 w-full border border-gray-300 rounded-md mb-2">
+            <div className="h-[300px] w-full border border-gray-300 rounded-md mb-2">
               <ModalMap onLocationSelect={handleMapClick} selectedLocation={selectedLocation} />
             </div>
           </div>
