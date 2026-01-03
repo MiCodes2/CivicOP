@@ -12,6 +12,7 @@ const CATEGORIES = [
 
 export default function ReportIssueForm({ onClose, onSuccess, initialLocation }) {
   const [formData, setFormData] = useState({
+    title: '',
     description: '',
     category: 'Pothole',
     severity: 3,
@@ -68,11 +69,42 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
           address: display_name
         }))
       } else {
-        setError('Address not found. Please try a different address.')
+        // Fallback: Try without country restriction
+        const fallbackResponse = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(formData.address)}&limit=1`
+        )
+        const fallbackData = await fallbackResponse.json()
+        
+        if (fallbackData && fallbackData.length > 0) {
+          const { lat, lon, display_name } = fallbackData[0]
+          setFormData(prev => ({
+            ...prev,
+            latitude: parseFloat(lat),
+            longitude: parseFloat(lon),
+            address: display_name
+          }))
+        } else {
+          // Final fallback: Use approximate center coordinates and keep address
+          // Default to India center if no results found
+          setFormData(prev => ({
+            ...prev,
+            latitude: 20.5937,
+            longitude: 78.9629,
+            address: formData.address // Keep user-entered address
+          }))
+          setError('Could not find exact location. Using approximate coordinates. Please verify on map or use current location.')
+        }
       }
     } catch (err) {
       console.error('Geocoding error:', err)
-      setError('Failed to geocode address. Please try again.')
+      // Fallback on error: Use approximate coordinates
+      setFormData(prev => ({
+        ...prev,
+        latitude: 20.5937,
+        longitude: 78.9629,
+        address: formData.address
+      }))
+      setError('Geocoding service unavailable. Using approximate coordinates. Please use current location for accuracy.')
     } finally {
       setGeocodingLoading(false)
     }
@@ -125,6 +157,9 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
 
     try {
       // Validate required fields
+      if (!formData.title.trim()) {
+        throw new Error('Please provide a title')
+      }
       if (!formData.description.trim()) {
         throw new Error('Please provide a description')
       }
@@ -161,6 +196,7 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
       const { data, error: insertError } = await supabase
         .from('civic_issues')
         .insert([{
+          title: formData.title,
           description: formData.description,
           category: formData.category,
           severity: formData.severity,
@@ -182,11 +218,14 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
       
       // Reset form
       setFormData({
+        title: '',
         description: '',
         category: 'Pothole',
         severity: 3,
         latitude: null,
         longitude: null,
+        address: '',
+        ward_number: '',
       })
       setImageFile(null)
       setImagePreview(null)
@@ -202,8 +241,8 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full my-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-gray-900">Report an Issue</h2>
@@ -308,6 +347,21 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Title */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Title *
+            </label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Brief title for the issue (e.g., Large pothole on Main Street)"
+              required
+            />
           </div>
 
           {/* Description */}

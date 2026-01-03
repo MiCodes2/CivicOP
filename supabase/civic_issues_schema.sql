@@ -8,6 +8,7 @@ CREATE EXTENSION IF NOT EXISTS "postgis";
 -- Create civic_issues table
 CREATE TABLE IF NOT EXISTS civic_issues (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title TEXT NOT NULL,
     description TEXT NOT NULL,
     image_url TEXT,
     latitude DOUBLE PRECISION NOT NULL,
