@@ -50,18 +50,19 @@ const MapComponent = ({ onLocationSelect, selectedLocation }) => {
     setSearching(true);
     setError('');
     try {
+      // Use Photon API for better OSM geocoding (faster than Nominatim)
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          searchQuery + ', Bengaluru, Karnataka, India'
-        )}&limit=5`,
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(searchQuery)}&limit=10&lon=77.5946&lat=12.9716&zoom=12&lang=en`,
         { signal: AbortSignal.timeout(10000) }
       );
       const data = await response.json();
 
       // Filter to only Bengaluru locations
-      const bengaluruResults = data.filter((result) =>
-        isWithinBengaluru(parseFloat(result.lat), parseFloat(result.lon))
-      );
+      const bengaluruResults = data.features?.filter((result) => {
+        const coords = result.geometry.coordinates;
+        const lon = coords[0], lat = coords[1];
+        return isWithinBengaluru(lat, lon);
+      }) || [];
 
       if (bengaluruResults.length === 0) {
         setError('No locations found in Bengaluru. Please try a different search.');
@@ -77,7 +78,9 @@ const MapComponent = ({ onLocationSelect, selectedLocation }) => {
   };
 
   const handleSelectSearchResult = (result) => {
-    onLocationSelect(parseFloat(result.lat), parseFloat(result.lon));
+    const coords = result.geometry.coordinates;
+    const lon = coords[0], lat = coords[1];
+    onLocationSelect(lat, lon);
     setSearchQuery('');
     setSearchResults([]);
   };
@@ -118,8 +121,8 @@ const MapComponent = ({ onLocationSelect, selectedLocation }) => {
                 onClick={() => handleSelectSearchResult(result)}
                 className="w-full text-left px-4 py-2 hover:bg-gray-100 border-b last:border-b-0 text-sm"
               >
-                <div className="font-medium text-gray-900">{result.name || result.display_name}</div>
-                <div className="text-xs text-gray-500 truncate">{result.display_name}</div>
+                <div className="font-medium text-gray-900">{result.properties.name}</div>
+                <div className="text-xs text-gray-500 truncate">{result.properties.locality || result.properties.county || result.properties.city}</div>
               </button>
             ))}
           </div>

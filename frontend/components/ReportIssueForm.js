@@ -66,26 +66,34 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
     setError(null)
     
     try {
-      // Search with Bengaluru context
-      const searchQuery = `${formData.address}, Bengaluru, Karnataka, India`
+      // Search using Photon API (faster & better OSM-based geocoding than Nominatim)
+      const searchQuery = `${formData.address}`
       let response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5`,
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(searchQuery)}&limit=10&lon=77.5946&lat=12.9716&zoom=12&lang=en`,
         { signal: AbortSignal.timeout(10000) }
       )
       let data = await response.json()
       
-      if (data && data.length > 0) {
-        // Filter results to only Bengaluru area
-        const bengaluruResults = data.filter(result => isWithinBengaluru(parseFloat(result.lat), parseFloat(result.lon)))
+      if (data && data.features && data.features.length > 0) {
+        // Photon API returns features with geometry (GeoJSON format)
+        const features = data.features
+        const bengaluruResults = features.filter(result => {
+          const coords = result.geometry.coordinates
+          const lon = coords[0], lat = coords[1]
+          return isWithinBengaluru(lat, lon)
+        })
         
         if (bengaluruResults.length > 0) {
           // Success: Found location in Bengaluru
-          const { lat, lon, display_name } = bengaluruResults[0]
+          const feature = bengaluruResults[0]
+          const coords = feature.geometry.coordinates
+          const lon = coords[0], lat = coords[1]
+          const displayName = feature.properties.name || `${lat.toFixed(6)}, ${lon.toFixed(6)}`
           setFormData(prev => ({
             ...prev,
-            latitude: parseFloat(lat),
-            longitude: parseFloat(lon),
-            address: display_name
+            latitude: lat,
+            longitude: lon,
+            address: displayName
           }))
           setError(null)
         } else {
@@ -183,7 +191,7 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
         const filePath = `public/${fileName}`
 
         const { error: uploadError } = await supabase.storage
-          .from('issues')
+          .from('civic-issue-images')
           .upload(filePath, imageFile, {
             cacheControl: '0',
             upsert: false
@@ -193,7 +201,7 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
 
         // Get public URL
         const { data: { publicUrl } } = supabase.storage
-          .from('issues')
+          .from('civic-issue-images')
           .getPublicUrl(filePath)
 
         imageUrl = publicUrl

@@ -203,8 +203,8 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
             icon={L.divIcon({
               className: 'user-current-location',
               html: `<div class="user-location-blue-dot"></div>`,
-              iconSize: [28, 28],
-              iconAnchor: [14, 14],
+              iconSize: [32, 32],
+              iconAnchor: [16, 16],
             })}
             zIndexOffset={1000}
           >
@@ -381,13 +381,13 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
         
         .user-location-blue-dot {
           position: relative;
-          width: 22px;
-          height: 22px;
-          background: linear-gradient(135deg, #3B99D9, #2563eb);
+          width: 28px;
+          height: 28px;
+          background: linear-gradient(135deg, #1E40AF, #3B82F6);
           border-radius: 50%;
-          border: 4px solid #ffffff;
-          box-shadow: 0 2px 8px rgba(37, 99, 235, 0.5);
-          animation: userLocationPulse 2s infinite;
+          border: 5px solid #ffffff;
+          box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.3), 0 4px 12px rgba(30, 64, 175, 0.6);
+          animation: userLocationPulse 2.5s infinite;
         }
         
         .user-location-blue-dot::before {
@@ -396,8 +396,8 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
           left: 50%;
           top: 50%;
           transform: translate(-50%, -50%);
-          width: 8px;
-          height: 8px;
+          width: 10px;
+          height: 10px;
           background: #ffffff;
           border-radius: 50%;
           box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
