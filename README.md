@@ -5,218 +5,213 @@ A scalable, event-driven platform for civic incident reporting with AI-powered p
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.11+
+- Python 3.8+
 - Node.js 18+
 - Supabase account (free tier works!)
-- Optional: Docker & Docker Compose for containerized deployment
+- Docker & Docker Compose (optional)
 
-### Development Setup (Recommended)
+### Setup
 
-**Fast Setup:**
-```bash
-# Clone repository
-git clone https://github.com/MiCodes2/GuardTech.git
-cd GuardTech
-
-# Run quick start script
-chmod +x quickstart.sh
-./quickstart.sh
-```
-
-**Manual Setup:**
-1. Copy environment files:
+1. **Clone & Install:**
    ```bash
-   cp backend/.env.example backend/.env
-   cp frontend/.env.local.example frontend/.env.local
+   git clone https://github.com/MiCodes2/GuardTech.git
+   cd GuardTech
    ```
 
-2. Update with your Supabase credentials (see [DEV_SETUP.md](DEV_SETUP.md))
-
-3. Install dependencies:
+2. **Backend Setup:**
    ```bash
-   # Backend
    cd backend
    python3 -m venv venv
-   source venv/bin/activate
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements.txt
-   cd ..
-   
-   # Frontend
+   ```
+
+3. **Frontend Setup:**
+   ```bash
    cd frontend
    npm install
-   cd ..
    ```
 
-4. Start development servers:
+4. **Environment Configuration:**
+   - Backend: `/workspaces/GuardTech/backend/.env` (Supabase credentials included)
+   - Frontend: `/workspaces/GuardTech/frontend/.env.local` (Supabase credentials included)
+
+5. **Start Servers:**
    ```bash
-   npm run dev
+   # Terminal 1: Backend
+   cd backend
+   source venv/bin/activate
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+   
+   # Terminal 2: Frontend
+   cd frontend
+   npm run dev  # Runs on http://localhost:3000
    ```
 
-📚 **Detailed Setup Guide**: See [DEV_SETUP.md](DEV_SETUP.md) for complete instructions  
-🔥 **Quick Reference**: See [QUICK_REFERENCE.md](QUICK_REFERENCE.md) for common commands
+## 📦 What's Included
 
-### Docker Deployment (Alternative)
+### Database Schema (Supabase)
+- **civic_issues** - Anonymous issue reporting (main table)
+- **users** - User accounts (citizen/official/admin)
+- **wards** - City ward/location data
+- **ai_analysis** - AI analysis results
+- **audit_logs** - Audit trail
+- **Storage** - `civic-issue-images` bucket (5MB per file)
 
-```bash
-# Start all services with Docker
-docker-compose up --build
+### Backend Features
+- FastAPI REST API
+- Supabase PostgreSQL integration
+- Row Level Security (RLS) for data protection
+- WebSocket support for real-time updates
+- Task scheduling with Celery
+- AI/ML processing pipeline
 
-# Check status
-docker-compose ps
-```
-
-## 📋 Services & Ports
-
-| Service | Port | URL | Description |
-|---------|------|-----|-------------|
-| **Next.js Frontend** | 3041 | http://localhost:3041 | Web application |
-| **FastAPI Backend** | 8000 | http://localhost:8000 | REST API |
-| **API Documentation** | 8000 | http://localhost:8000/docs | Interactive API docs |
-| **Supabase** | - | Your project URL | Database, Auth, Storage |
-| **Redis** (optional) | 6379 | `redis://localhost:6379` | Cache & queues |
-
-## 🏗️ Architecture
-
-### System Components
-- **Frontend**: Next.js 14 with React 18, TypeScript, Tailwind CSS
-- **Backend**: FastAPI with async/await, SQLAlchemy, Pydantic
-- **Database**: Supabase (PostgreSQL) with PostGIS for geospatial data
-- **Authentication**: Supabase Auth with JWT
-- **Storage**: Supabase Storage for media files
-- **Real-time**: Supabase Realtime for live updates
-- **Worker**: Celery for async AI/ML processing (optional)
-- **AI/ML**: OpenAI GPT, PyTorch, Transformers
-- **Database**: PostgreSQL with PostGIS for spatial data
-- **Storage**: AWS S3 for images (configured)
-- **AI**: OpenCV/YOLO for image processing, LLM for verification
-
-### Data Flow
-1. Citizen uploads photo via Next.js app
-2. FastAPI receives request and queues job to Redis
-3. Celery worker picks up job and processes with AI
-4. Validated data stored in PostgreSQL
-5. Real-time updates sent via WebSocket
-
-## 📊 Database Schema
-
-### Core Tables
-- **incidents**: Raw report data with GPS coordinates
-- **ai_analysis**: AI processing results and confidence scores
-- **audit_log**: Complete audit trail of all status changes
-
-### Sample Data
-```sql
--- Database: civicop
--- User: civicop_user
--- Password: civicop_pass
-```
+### Frontend Features
+- Next.js with TypeScript
+- Real-time data fetching with Supabase
+- Interactive maps with location tracking
+- Issue submission & tracking
+- Admin dashboard
+- Responsive design with Tailwind CSS
 
 ## 🔧 API Endpoints
 
-### Base URL: http://localhost:8040/api/v1
-
-- `GET /incidents` - List all incidents
-- `GET /incidents/{id}` - Get specific incident
-- `POST /incidents` - Create new incident report
-
-### API Documentation
-Visit http://localhost:8040/docs for interactive API documentation.
-
-## 🐳 Docker Commands
-
-```bash
-# Start all services
-docker-compose up -d
-
-# Start specific service
-docker-compose up postgres -d
-docker-compose up redis -d
-
-# View logs
-docker-compose logs -f backend
-docker-compose logs -f frontend
-
-# Stop services
-docker-compose down
-
-# Rebuild and restart
-docker-compose up --build --force-recreate
+```
+GET    /api/v1/incidents          - List all civic issues
+POST   /api/v1/incidents          - Submit new issue
+GET    /api/v1/incidents/{id}     - Get issue details
+PUT    /api/v1/incidents/{id}     - Update issue
+GET    /api/v1/incidents/{id}/ai  - Get AI analysis
 ```
 
-## 🔐 Environment Variables
+## 🗄️ Database Schema
 
-Create a `.env` file in the project root:
+**civic_issues table:**
+- `id` (UUID) - Unique identifier
+- `title` (TEXT) - Issue title
+- `description` (TEXT) - Detailed description
+- `category` (TEXT) - Issue category
+- `severity` (INTEGER 1-5) - Severity level
+- `status` (TEXT) - OPEN/IN_PROGRESS/RESOLVED/CLOSED
+- `latitude/longitude` (DOUBLE) - Location
+- `address` (TEXT) - Full address
+- `image_url` (TEXT) - URL of uploaded image
+- `created_at/updated_at` (TIMESTAMP) - Timestamps
+- `location` (GEOGRAPHY) - PostGIS geospatial data
 
-```env
-# Database
-DATABASE_URL=postgresql://civicop_user:civicop_pass@localhost:5440/civicop
+**users table:**
+- `id` (UUID) - Unique identifier
+- `email` (VARCHAR) - Email (unique)
+- `hashed_password` (VARCHAR) - Encrypted password
+- `full_name` (VARCHAR) - User's name
+- `role` (VARCHAR) - citizen/official/admin
+- `is_active` (BOOLEAN) - Account status
 
-# Redis
-REDIS_URL=redis://localhost:6389/0
+## 🔐 Security
 
-# AWS S3 (for image storage)
-AWS_ACCESS_KEY_ID=your_access_key
-AWS_SECRET_ACCESS_KEY=your_secret_key
-S3_BUCKET=civicop-images
+- Row Level Security (RLS) on all tables
+- Public anonymous issue submission
+- Authenticated user features
+- Admin-only actions
+- Image storage with size limits
+- Secure password hashing
 
-# API
-SECRET_KEY=your-secret-key-here
+## 📝 Configuration
 
-# Optional: Theme colors (also add client vars to frontend/.env.local)
-THEME_CITY=#F9A825
-THEME_WATER=#3B99D9
-THEME_TRANSPORT=#D32F2F
-THEME_GREEN=#388E3C
-THEME_BG=#FFFFFF
+### Backend .env
+```
+SUPABASE_URL=https://pzopyqzogbumlvjmtecw.supabase.co
+SUPABASE_KEY=<your-anon-key>
+SUPABASE_SERVICE_KEY=<your-service-key>
+DATABASE_URL=postgresql://postgres...
 ```
 
-On the frontend, create `frontend/.env.local` with public vars to expose to the browser:
-
-```env
-NEXT_PUBLIC_THEME_CITY=#F9A825
-NEXT_PUBLIC_THEME_WATER=#3B99D9
-NEXT_PUBLIC_THEME_TRANSPORT=#D32F2F
-NEXT_PUBLIC_THEME_GREEN=#388E3C
-NEXT_PUBLIC_THEME_BG=#FFFFFF
+### Frontend .env.local
 ```
-
-## 🧪 Testing
-
-```bash
-# Backend tests
-cd backend && python -m pytest
-
-# Frontend tests
-cd frontend && npm test
+NEXT_PUBLIC_SUPABASE_URL=https://pzopyqzogbumlvjmtecw.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
 ```
 
 ## 🚀 Deployment
 
-### Production Setup
-1. Configure environment variables
-2. Set up AWS S3 bucket
-3. Configure domain and SSL
-4. Deploy using Docker Compose
-5. Set up monitoring and logging
+### Docker (Recommended)
+```bash
+docker-compose up -d
+```
 
-### Scaling
-- Use Redis cluster for high availability
-- Scale Celery workers based on load
-- Implement database read replicas
-- Use CDN for static assets
+Starts:
+- Backend on http://localhost:8000
+- Frontend on http://localhost:3000
+- Nginx on http://localhost:80
+
+### Manual Deployment
+See deployment guides in your hosting provider documentation.
+
+## 🧪 Testing
+
+### Backend Tests
+```bash
+cd backend
+pytest tests/
+```
+
+### Frontend Tests
+```bash
+cd frontend
+npm test
+```
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
-## 📝 License
+## 📄 License
 
-This project is licensed under the MIT License.
+MIT License - See LICENSE file for details
 
 ## 📞 Support
 
-For questions or issues, please open an issue on GitHub.
+- Issue Tracker: GitHub Issues
+- Documentation: See inline code comments
+- API Docs: http://localhost:8000/docs (when backend is running)
+
+## 🎯 Project Status
+
+✅ Schema & Database Setup
+✅ Backend API
+✅ Frontend Application
+✅ Real-time Features
+✅ Storage Integration
+⏳ Advanced Analytics
+⏳ Mobile App
+
+## 📚 Tech Stack
+
+**Backend:**
+- FastAPI (Python)
+- Supabase (PostgreSQL)
+- PostGIS (Geospatial)
+- Celery (Task Queue)
+- Redis (Caching)
+
+**Frontend:**
+- Next.js (React)
+- TypeScript
+- Tailwind CSS
+- Supabase Client
+- Leaflet Maps
+
+**Infrastructure:**
+- Docker
+- Docker Compose
+- Nginx
+- GitHub Actions (CI/CD)
+
+---
+
+**Last Updated:** January 3, 2026
+**Version:** 1.0.0
