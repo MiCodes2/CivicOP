@@ -76,23 +76,39 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
     return '#10B981'; // Green for low (1)
   };
 
-  // Create custom icon based on severity
+  // Create custom icon based on severity with enhanced styling and animation
   const createSeverityIcon = (severity) => {
-    const color = getMarkerColor(severity);
+    const color = getMarkerColor(severity)
+    const severityLabels = ['', 'Low', 'Minor', 'Medium', 'High', 'Critical']
+    const severityLabel = severityLabels[severity] || 'Medium'
+    const emoji = severity >= 4 ? '🚨' : severity === 3 ? '⚠️' : severity === 2 ? '⚡' : '✓'
+    
     return L.divIcon({
-      className: 'custom-severity-marker',
-      html: `<div style="
-        background-color: ${color};
-        width: 30px;
-        height: 30px;
+      className: 'severity-marker-wrapper',
+      html: `<div class="severity-marker-bounce" style="
+        background: linear-gradient(135deg, ${color}dd 0%, ${color} 100%);
+        width: 44px;
+        height: 44px;
         border-radius: 50% 50% 50% 0;
-        border: 3px solid white;
+        border: 4px solid white;
         transform: rotate(-45deg);
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      "></div>`,
-      iconSize: [30, 30],
-      iconAnchor: [15, 30],
-      popupAnchor: [0, -30],
+        box-shadow: 0 4px 16px rgba(0,0,0,0.3), inset 0 -2px 6px rgba(0,0,0,0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        font-size: 20px;
+        color: white;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+        position: relative;
+      " title="${severityLabel}">
+        <div style="transform: rotate(45deg); display: flex; align-items: center; justify-content: center;">${emoji}</div>
+      </div>
+      <div class="severity-pulse" style="position: absolute; width: 48px; height: 48px; border-radius: 50%; border: 2px solid ${color}; opacity: 0; left: 50%; top: 50%; transform: translate(-50%, -50%); animation: pulse 2s infinite;"></div>`,
+      iconSize: [44, 44],
+      iconAnchor: [22, 44],
+      popupAnchor: [0, -44],
+      className: 'severity-marker-container'
     });
   };
 
@@ -127,36 +143,81 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
               position={[incident.latitude, incident.longitude]}
               icon={customIcon}
             >
-              <Popup>
-                <div className="p-2 min-w-[200px]">
-                  <h3 className="font-semibold text-sm">{incident.category ? incident.category.charAt(0).toUpperCase() + incident.category.slice(1) : 'Issue'}</h3>
-                  <p className="text-xs text-gray-600 mt-1">{incident.description || 'No description provided'}</p>
-                  
-                  {incident.image_url && (
-                    <img 
-                      src={incident.image_url} 
-                      alt="Issue" 
-                      className="w-full h-24 object-cover rounded mt-2"
-                    />
-                  )}
-                  
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className={`inline-block px-2 py-1 text-xs rounded-full border ${
-                      incident.status === 'OPEN' ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                      incident.status === 'IN_PROGRESS' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                      incident.status === 'RESOLVED' ? 'bg-green-50 text-green-700 border-green-200' :
-                      incident.status === 'CLOSED' ? 'bg-gray-50 text-gray-700 border-gray-200' :
-                      'bg-gray-100 text-gray-700 border-gray-200'
+              <Popup maxWidth={300}>
+                <div className="p-3 min-w-[240px]">
+                  {/* Header with category and status */}
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <h3 className="font-bold text-sm text-gray-900 flex-1">
+                      {incident.category ? incident.category.charAt(0).toUpperCase() + incident.category.slice(1) : 'Issue'}
+                    </h3>
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                      incident.status === 'OPEN' ? 'bg-orange-100 text-orange-800' :
+                      incident.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
+                      incident.status === 'RESOLVED' ? 'bg-green-100 text-green-800' :
+                      incident.status === 'CLOSED' ? 'bg-gray-100 text-gray-800' :
+                      'bg-gray-100 text-gray-700'
                     }`}>
                       {incident.status || 'OPEN'}
                     </span>
-                    <span className="text-xs text-gray-500">
-                      Severity: {incident.severity || 3}/5
-                    </span>
                   </div>
                   
-                  <div className="text-xs text-gray-400 mt-2">
-                    {new Date(incident.created_at).toLocaleString()}
+                  {/* Description */}
+                  <p className="text-xs text-gray-700 mb-2 leading-relaxed line-clamp-3">
+                    {incident.description || 'No description provided'}
+                  </p>
+                  
+                  {/* Address and Ward */}
+                  <div className="space-y-1 mb-2 text-xs text-gray-600">
+                    {incident.address && (
+                      <div className="flex items-start gap-1">
+                        <span className="text-base mt-0.5">📍</span>
+                        <span className="line-clamp-2">{incident.address}</span>
+                      </div>
+                    )}
+                    {incident.ward_number && (
+                      <div className="flex items-center gap-1">
+                        <span>🏛️</span>
+                        <span className="font-medium">{incident.ward_number}</span>
+                      </div>
+                    )}
+                    {!incident.address && (
+                      <div className="flex items-center gap-1 text-gray-500">
+                        <span>📍</span>
+                        <span className="text-xs">{incident.latitude.toFixed(4)}, {incident.longitude.toFixed(4)}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Image if available */}
+                  {incident.image_url && (
+                    <div className="mb-2">
+                      <img 
+                        src={incident.image_url} 
+                        alt={incident.category}
+                        className="w-full h-32 object-cover rounded-lg border border-gray-200"
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Severity and timestamp */}
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-medium text-gray-600">Severity:</span>
+                      <div className="flex gap-0.5">
+                        {[...Array(5)].map((_, i) => (
+                          <div
+                            key={i}
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              i < incident.severity ? 'bg-red-500' : 'bg-gray-300'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-xs text-gray-600 ml-1">{incident.severity || 3}/5</span>
+                    </div>
+                    <span className="text-xs text-gray-500">
+                      {new Date(incident.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                    </span>
                   </div>
                 </div>
               </Popup>
@@ -166,40 +227,88 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
       </MapContainer>
 
       <style jsx>{`
-        .custom-marker {
-          display: flex;
-          align-items: center;
-          justify-content: center;
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0) rotate(-45deg); }
+          50% { transform: translateY(-8px) rotate(-45deg); }
         }
+        
+        @keyframes pulse {
+          0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.8; }
+          100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+        }
+        
+        .severity-marker-bounce {
+          animation: bounce 2s infinite ease-in-out;
+        }
+        
+        .severity-marker-container {
+          filter: drop-shadow(0 3px 8px rgba(0,0,0,0.2));
+        }
+        
+        .severity-marker-wrapper:hover {
+          filter: drop-shadow(0 6px 16px rgba(0,0,0,0.3)) brightness(1.1);
+          z-index: 1000 !important;
+        }
+
+        /* Enhanced popup styling */
         .leaflet-popup-content-wrapper {
-          border-radius: 8px;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+          border-radius: 12px;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+          border: 1px solid rgba(0, 0, 0, 0.05);
+          background: linear-gradient(to bottom, #ffffff, #f9fafb);
+          padding: 2px;
         }
+        
         .leaflet-popup-content {
           margin: 0;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        .leaflet-popup-content h3 {
+          margin-top: 0;
+          color: #111827;
+          font-size: 15px;
+        }
+        
+        .leaflet-popup-content p {
+          color: #6b7280;
+          font-size: 13px;
+          line-height: 1.5;
+        }
+        
+        .leaflet-popup-tip-container {
+          filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
         }
 
         /* Floating blue pin for user location */
         .user-location-pin {
           position: relative;
-          width: 18px;
-          height: 18px;
-          background: var(--theme-water);
+          width: 20px;
+          height: 20px;
+          background: linear-gradient(135deg, #3B99D9, #2563eb);
           transform: rotate(-45deg);
           border-radius: 50% 50% 50% 0;
-          border: 2px solid #ffffff;
-          box-shadow: 0 2px 8px rgba(59,153,217,0.35);
+          border: 3px solid #ffffff;
+          box-shadow: 0 4px 12px rgba(59,153,217,0.4);
+          animation: pulse 2s infinite;
         }
+        
         .user-location-pin::after {
           content: '';
           position: absolute;
           left: 50%;
           top: 42%;
           transform: translate(-50%, -50%) rotate(45deg);
-          width: 8px;
-          height: 8px;
+          width: 6px;
+          height: 6px;
           background: #ffffff;
           border-radius: 50%;
+          box-shadow: inset 0 0 3px rgba(0,0,0,0.2);
+        }
+        
+        /* Leaflet marker hover effect */
+        .leaflet-marker-pane .leaflet-marker-icon:hover {
+          z-index: 1001 !important;
         }
       `}</style>
     </div>

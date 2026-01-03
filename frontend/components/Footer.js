@@ -1,11 +1,10 @@
 export default function Footer() {
   return (
     <footer 
-      className="mt-auto flex flex-col w-full" 
+      className="mt-auto flex flex-col w-full hidden md:flex" 
       style={{
         backgroundColor: 'var(--theme-water)', 
         color: 'white', 
-        // FIX: Removed 'minHeight' so the footer can actually shrink to fit the smaller padding
         marginBottom: 0, 
         borderTop: 'none'
       }}

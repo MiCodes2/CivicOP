@@ -44,7 +44,7 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
     }
   }, [])
 
-  // Geocode address to lat/lng using OpenStreetMap Nominatim
+  // Geocode address to lat/lng using OpenStreetMap Nominatim with robust fallbacks
   const handleAddressGeocode = async () => {
     if (!formData.address.trim()) {
       setError('Please enter an address')
@@ -55,12 +55,24 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
     setError(null)
     
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(formData.address)}&countrycodes=in&limit=1`
+      // First attempt: Search with India country code
+      let response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(formData.address)}&countrycodes=in&limit=1`,
+        { signal: AbortSignal.timeout(10000) }
       )
-      const data = await response.json()
+      let data = await response.json()
+      
+      // Second attempt: Without country restriction if first fails
+      if (!data || data.length === 0) {
+        response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(formData.address)}&limit=1`,
+          { signal: AbortSignal.timeout(10000) }
+        )
+        data = await response.json()
+      }
       
       if (data && data.length > 0) {
+        // Success: Found location
         const { lat, lon, display_name } = data[0]
         setFormData(prev => ({
           ...prev,
@@ -69,42 +81,29 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
           address: display_name
         }))
       } else {
-        // Fallback: Try without country restriction
-        const fallbackResponse = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(formData.address)}&limit=1`
-        )
-        const fallbackData = await fallbackResponse.json()
-        
-        if (fallbackData && fallbackData.length > 0) {
-          const { lat, lon, display_name } = fallbackData[0]
-          setFormData(prev => ({
-            ...prev,
-            latitude: parseFloat(lat),
-            longitude: parseFloat(lon),
-            address: display_name
-          }))
-        } else {
-          // Final fallback: Use approximate center coordinates and keep address
-          // Default to India center if no results found
-          setFormData(prev => ({
-            ...prev,
-            latitude: 20.5937,
-            longitude: 78.9629,
-            address: formData.address // Keep user-entered address
-          }))
-          setError('Could not find exact location. Using approximate coordinates. Please verify on map or use current location.')
-        }
+        // Fallback: No results found, use Delhi as default
+        const approxLat = 28.6139  // Delhi center
+        const approxLng = 77.2090
+        setFormData(prev => ({
+          ...prev,
+          latitude: approxLat,
+          longitude: approxLng,
+          address: formData.address
+        }))
+        setError('📍 Location not found. Using approximate coordinates near Delhi. Please enable GPS for accurate location.')
       }
     } catch (err) {
       console.error('Geocoding error:', err)
-      // Fallback on error: Use approximate coordinates
+      // Network error fallback: Use Delhi coordinates
+      const approxLat = 28.6139
+      const approxLng = 77.2090
       setFormData(prev => ({
         ...prev,
-        latitude: 20.5937,
-        longitude: 78.9629,
+        latitude: approxLat,
+        longitude: approxLng,
         address: formData.address
       }))
-      setError('Geocoding service unavailable. Using approximate coordinates. Please use current location for accuracy.')
+      setError('⚠️ Could not reach location service. Using approximate coordinates. Please enable GPS for better accuracy.')
     } finally {
       setGeocodingLoading(false)
     }
@@ -241,8 +240,8 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full my-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 overflow-y-auto" style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}>
+      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full my-4 max-h-[calc(100vh-5rem)] overflow-y-auto" role="dialog" aria-modal="true">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-gray-900">Report an Issue</h2>
@@ -257,7 +256,7 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 pb-10">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
               {error}
