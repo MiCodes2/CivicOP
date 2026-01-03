@@ -68,16 +68,32 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
   const THEME_TRANSPORT = process.env.NEXT_PUBLIC_THEME_TRANSPORT || '#D32F2F';
   const THEME_GREENSPACE = process.env.NEXT_PUBLIC_THEME_GREEN || '#388E3C';
 
-  const getMarkerColor = (status) => {
-    switch (status) {
-      case 'reported': return THEME_CITY; 
-      case 'processing': return THEME_WATER; 
-      case 'verified': return THEME_GREENSPACE; 
-      case 'assigned': return THEME_TRANSPORT; 
-      case 'resolved': return THEME_GREENSPACE; 
-      case 'rejected': return THEME_TRANSPORT; 
-      default: return '#6b7280'; 
-    }
+  // Get marker color based on severity (1-5)
+  const getMarkerColor = (severity) => {
+    if (severity >= 4) return '#DC2626'; // Red for high severity (4-5)
+    if (severity === 3) return '#F59E0B'; // Orange for medium (3)
+    if (severity === 2) return '#FCD34D'; // Yellow for minor (2)
+    return '#10B981'; // Green for low (1)
+  };
+
+  // Create custom icon based on severity
+  const createSeverityIcon = (severity) => {
+    const color = getMarkerColor(severity);
+    return L.divIcon({
+      className: 'custom-severity-marker',
+      html: `<div style="
+        background-color: ${color};
+        width: 30px;
+        height: 30px;
+        border-radius: 50% 50% 50% 0;
+        border: 3px solid white;
+        transform: rotate(-45deg);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      "></div>`,
+      iconSize: [30, 30],
+      iconAnchor: [15, 30],
+      popupAnchor: [0, -30],
+    });
   };
 
   return (
@@ -103,13 +119,7 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
           </Marker>
         )}
         {incidents && incidents.filter(i => Number.isFinite(i.latitude) && Number.isFinite(i.longitude)).map((incident) => {
-          const markerColor = getMarkerColor(incident.status);
-          const customIcon = L.divIcon({
-            className: 'custom-marker',
-            html: `<div style="background-color: ${markerColor}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>`,
-            iconSize: [20, 20],
-            iconAnchor: [10, 10],
-          });
+          const customIcon = createSeverityIcon(incident.severity || 3);
 
           return (
             <Marker
@@ -118,19 +128,35 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
               icon={customIcon}
             >
               <Popup>
-                <div className="p-2">
+                <div className="p-2 min-w-[200px]">
                   <h3 className="font-semibold text-sm">{incident.category ? incident.category.charAt(0).toUpperCase() + incident.category.slice(1) : 'Issue'}</h3>
                   <p className="text-xs text-gray-600 mt-1">{incident.description || 'No description provided'}</p>
-                  <div className="mt-2">
+                  
+                  {incident.image_url && (
+                    <img 
+                      src={incident.image_url} 
+                      alt="Issue" 
+                      className="w-full h-24 object-cover rounded mt-2"
+                    />
+                  )}
+                  
+                  <div className="mt-2 flex items-center gap-2">
                     <span className={`inline-block px-2 py-1 text-xs rounded-full border ${
-                      incident.status === 'reported' ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                      incident.status === 'processing' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                      incident.status === 'verified' ? 'bg-green-50 text-green-700 border-green-200' :
-                      incident.status === 'assigned' ? 'bg-red-50 text-red-700 border-red-200' :
+                      incident.status === 'OPEN' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                      incident.status === 'IN_PROGRESS' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                      incident.status === 'RESOLVED' ? 'bg-green-50 text-green-700 border-green-200' :
+                      incident.status === 'CLOSED' ? 'bg-gray-50 text-gray-700 border-gray-200' :
                       'bg-gray-100 text-gray-700 border-gray-200'
                     }`}>
-                      {incident.status}
+                      {incident.status || 'OPEN'}
                     </span>
+                    <span className="text-xs text-gray-500">
+                      Severity: {incident.severity || 3}/5
+                    </span>
+                  </div>
+                  
+                  <div className="text-xs text-gray-400 mt-2">
+                    {new Date(incident.created_at).toLocaleString()}
                   </div>
                 </div>
               </Popup>

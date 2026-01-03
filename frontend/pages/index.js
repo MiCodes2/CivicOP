@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
+import { supabase } from '../lib/supabase';
 
 // Dynamically import map to avoid SSR issues
 const DynamicMap = dynamic(() => import('../components/Map'), {
@@ -9,10 +10,9 @@ const DynamicMap = dynamic(() => import('../components/Map'), {
   loading: () => <div className="h-[411px] md:h-[694px] bg-gray-200 rounded-lg flex items-center justify-center">Loading map...</div>
 });
 
-// Dynamic import for modal map
-const ModalMap = dynamic(() => import('./ModalMap'), {
+// Dynamic import for report form
+const ReportIssueForm = dynamic(() => import('../components/ReportIssueForm'), {
   ssr: false,
-  loading: () => <div className="h-[321px] bg-gray-200 rounded-md flex items-center justify-center">Loading map...</div>
 });
 
 import CameraOverlay from '../components/CameraOverlay';
@@ -23,20 +23,44 @@ export default function Home() {
   const [showReportForm, setShowReportForm] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
 
-  // Fetch incidents from API
+  // Fetch incidents from Supabase
   useEffect(() => {
     fetchIncidents();
+    
+    // Set up real-time subscription
+    const subscription = supabase
+      .channel('civic_issues_changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'civic_issues' 
+      }, (payload) => {
+        console.log('Real-time update:', payload);
+        if (payload.eventType === 'INSERT') {
+          setIncidents(prev => [payload.new, ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          setIncidents(prev => prev.map(inc => inc.id === payload.new.id ? payload.new : inc));
+        } else if (payload.eventType === 'DELETE') {
+          setIncidents(prev => prev.filter(inc => inc.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const fetchIncidents = async () => {
     try {
-      const response = await fetch('http://localhost:8040/api/v1/incidents/');
-      if (response.ok) {
-        const data = await response.json();
-        setIncidents(data);
-      } else {
-        console.error('Failed to fetch incidents');
-      }
+      const { data, error } = await supabase
+        .from('civic_issues')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      setIncidents(data || []);
     } catch (error) {
       console.error('Error fetching incidents:', error);
     }
@@ -60,14 +84,13 @@ export default function Home() {
   }, []);
 
   const handleReportIssue = () => {
-    setShowCamera(true);
+    setShowReportForm(true);
   };
 
-  const handlePhotoCapture = (blob) => {
-    // Placeholder: Handle photo capture
-    console.log('Photo captured:', blob);
-    setShowCamera(false);
-    setShowReportForm(true);
+  const handleReportSuccess = (newIssue) => {
+    console.log('Issue reported successfully:', newIssue);
+    // The real-time subscription will handle adding it to the list
+    setShowReportForm(false);
   };
 
   return (
@@ -114,23 +137,63 @@ export default function Home() {
                 </div>
               ) : (
                 incidents.map((incident) => (
-                  <div key={incident.id} className="p-4 hover:bg-gray-50">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900">{incident.category.charAt(0).toUpperCase() + incident.category.slice(1)} Issue</h4>
-                      <p className="text-sm text-gray-600 mt-1">{incident.description || 'No description provided'}</p>
-                      <div className="flex items-center mt-2 space-x-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          incident.status === 'reported' ? 'bg-city/10 text-city' :
-                          incident.status === 'processing' ? 'bg-water/10 text-water' :
-                          incident.status === 'verified' ? 'bg-greenspace/10 text-greenspace' :
-                          incident.status === 'assigned' ? 'bg-transport/10 text-transport' :
-                          incident.status === 'resolved' ? 'bg-greenspace/10 text-greenspace' :
-                          'bg-transport/10 text-transport'
+                  <div key={incident.id} className="p-4 hover:bg-gray-50 transition">
+                  <div className="flex justify-between items-start gap-3">
+                    {incident.image_url && (
+                      <img 
+                        src={incident.image_url} 
+                        alt={incident.category}
+                        className="w-16 h-16 rounded object-cover flex-shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between">
+                        <h4 className="text-sm font-medium text-gray-900 truncate">
+                          {incident.category || 'Issue'}
+                        </h4>
+                        <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                          incident.severity >= 4 ? 'bg-red-100 text-red-800' :
+                          incident.severity === 3 ? 'bg-orange-100 text-orange-800' :
+                          incident.severity === 2 ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-green-100 text-green-800'
                         }`}>
-                          {incident.status}
+                          {incident.severity ? `${incident.severity}/5` : '3/5'}
                         </span>
-                        <span className="text-xs text-gray-500">{new Date(incident.created_at).toLocaleDateString()}</span>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                        {incident.description || 'No description provided'}
+                      </p>
+                      {/* Location and Ward */}
+                      {(incident.address || incident.ward_number || incident.latitude) && (
+                        <div className="mt-1 text-xs text-gray-500 flex flex-col gap-0.5">
+                          {incident.address && (
+                            <span className="truncate" title={incident.address}>
+                              📍 {incident.address}
+                            </span>
+                          )}
+                          {!incident.address && incident.latitude && (
+                            <span>
+                              📍 {incident.latitude.toFixed(4)}, {incident.longitude.toFixed(4)}
+                            </span>
+                          )}
+                          {incident.ward_number && (
+                            <span>🏛️ {incident.ward_number}</span>
+                          )}
+                        </div>
+                      )}
+                      <div className="flex items-center mt-2 space-x-2">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          incident.status === 'OPEN' ? 'bg-orange-50 text-orange-700' :
+                          incident.status === 'IN_PROGRESS' ? 'bg-blue-50 text-blue-700' :
+                          incident.status === 'RESOLVED' ? 'bg-green-50 text-green-700' :
+                          incident.status === 'CLOSED' ? 'bg-gray-50 text-gray-700' :
+                          'bg-orange-50 text-orange-700'
+                        }`}>
+                          {incident.status || 'OPEN'}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(incident.created_at).toLocaleDateString()}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -144,227 +207,26 @@ export default function Home() {
 
       {/* Global footer rendered via <Footer /> component */}
 
-      {/* Camera Overlay */}
-      {showCamera && (
-        <CameraOverlay onCapture={handlePhotoCapture} onClose={() => setShowCamera(false)} />
-      )}
-
-      {/* Report Issue Modal */}
+      {/* Report Issue Form Modal */}
       {showReportForm && (
-        <ReportModal onClose={() => setShowReportForm(false)} userLocation={userLocation} />
+        <ReportIssueForm
+          onClose={() => setShowReportForm(false)}
+          onSuccess={handleReportSuccess}
+          initialLocation={userLocation}
+        />
       )}
-    </div>
-  );
-}
 
-// Report Modal Component
-function ReportModal({ onClose, userLocation }) {
-  const [formData, setFormData] = useState({
-    category: '',
-    description: '',
-    latitude: userLocation?.latitude || '',
-    longitude: userLocation?.longitude || '',
-    address: ''
-  });
-  const [selectedLocation, setSelectedLocation] = useState(null);
-
-  const geocodeAddress = async () => {
-    if (!formData.address.trim()) return;
-    try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(formData.address)}`);
-      const data = await response.json();
-      if (data.length > 0) {
-        const { lat, lon } = data[0];
-        setFormData({
-          ...formData,
-          latitude: parseFloat(lat),
-          longitude: parseFloat(lon)
-        });
-        setSelectedLocation([parseFloat(lat), parseFloat(lon)]);
-      } else {
-        alert('Address not found. Please try a different address.');
-      }
-    } catch (error) {
-      console.error('Geocoding error:', error);
-      alert('Error geocoding address. Please try again.');
-    }
-  };
-
-  const handleMapClick = (e) => {
-    const { lat, lng } = e.latlng;
-    setFormData({
-      ...formData,
-      latitude: lat,
-      longitude: lng
-    });
-    setSelectedLocation([lat, lng]);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    try {
-      const response = await fetch('http://localhost:8040/api/v1/incidents/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          category: formData.category,
-          description: formData.description,
-          latitude: parseFloat(formData.latitude),
-          longitude: parseFloat(formData.longitude),
-        }),
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        alert(`Incident reported successfully! ID: ${result.id}`);
-        onClose();
-        // Refresh incidents list
-        fetchIncidents();
-      } else {
-        const error = await response.json();
-        alert(`Error: ${error.detail || 'Failed to submit incident'}`);
-      }
-    } catch (error) {
-      console.error('Error submitting incident:', error);
-      alert('Network error. Please try again.');
-    }
-  };
-
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-md w-full p-6 border border-water/20 shadow-sm">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Report an Issue</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            ✕
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Category
-            </label>
-            <select
-              name="category"
-              value={formData.category}
-              onChange={handleChange}
-              required
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-water focus:border-water"
-            >
-              <option value="">Select category</option>
-              <option value="pothole">Pothole</option>
-              <option value="garbage">Garbage</option>
-              <option value="streetlight">Streetlight</option>
-              <option value="drainage">Drainage</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              required
-              rows={3}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-water focus:border-water" placeholder="Describe the issue..."
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Address (optional)
-            </label>
-            <div className="flex space-x-2">
-              <input
-                type="text"
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-                className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-water focus:border-water"
-                placeholder="Enter address to find location"
-              />
-              <button
-                type="button"
-                onClick={geocodeAddress}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md"
-              >
-                Find
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Location (click on map or enter coordinates)
-            </label>
-            <div className="h-[300px] w-full border border-gray-300 rounded-md mb-2">
-              <ModalMap onLocationSelect={handleMapClick} selectedLocation={selectedLocation} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Latitude
-              </label>
-              <input
-                type="number"
-                name="latitude"
-                value={formData.latitude}
-                onChange={handleChange}
-                step="any"
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-water focus:border-water"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Longitude
-              </label>
-              <input
-                type="number"
-                name="longitude"
-                value={formData.longitude}
-                onChange={handleChange}
-                step="any"
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-water focus:border-water"
-              />
-            </div>
-          </div>
-
-          <div className="flex space-x-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-md transition duration-200"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex-1 bg-water hover:bg-water/90 text-white font-medium py-2 px-4 rounded-md transition duration-200"
-            >
-              Submit Report
-            </button>
-          </div>
-        </form>
-      </div>
+      {/* Floating Report Button */}
+      <button
+        onClick={handleReportIssue}
+        className="fixed bottom-6 right-6 bg-red-600 hover:bg-red-700 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all transform hover:scale-110 z-[9999]"
+        title="Report an Issue"
+        style={{ pointerEvents: 'auto' }}
+      >
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+      </button>
     </div>
   );
 }

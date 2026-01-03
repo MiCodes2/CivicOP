@@ -1,0 +1,8 @@
+backend server start
+cd /workspaces/GuardTech/backend
+source venv/bin/activate
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+frontend start
+cd /workspaces/GuardTech/frontend
+npm run dev

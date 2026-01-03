@@ -1,0 +1,150 @@
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Supabase credentials not found. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local')
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+})
+
+// Database helper functions
+export const dbHelpers = {
+  // Users
+  async getUsers() {
+    const { data, error } = await supabase.from('users').select('*')
+    if (error) throw error
+    return data
+  },
+
+  async getUserById(id: string) {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  // Incidents
+  async getIncidents(limit = 100) {
+    const { data, error } = await supabase
+      .from('incidents')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    if (error) throw error
+    return data
+  },
+
+  async getIncidentById(id: string) {
+    const { data, error } = await supabase
+      .from('incidents')
+      .select('*')
+      .eq('id', id)
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async createIncident(incident: any) {
+    const { data, error } = await supabase
+      .from('incidents')
+      .insert([incident])
+      .select()
+    if (error) throw error
+    return data
+  },
+
+  async updateIncident(id: string, updates: any) {
+    const { data, error } = await supabase
+      .from('incidents')
+      .update(updates)
+      .eq('id', id)
+      .select()
+    if (error) throw error
+    return data
+  },
+
+  // Real-time subscriptions
+  subscribeToIncidents(callback: (payload: any) => void) {
+    return supabase
+      .channel('incidents-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, callback)
+      .subscribe()
+  },
+}
+
+// Auth helpers
+export const authHelpers = {
+  async signUp(email: string, password: string, userData?: any) {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: userData,
+      },
+    })
+    if (error) throw error
+    return data
+  },
+
+  async signIn(email: string, password: string) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    if (error) throw error
+    return data
+  },
+
+  async signOut() {
+    const { error } = await supabase.auth.signOut()
+    if (error) throw error
+  },
+
+  async getSession() {
+    const { data, error } = await supabase.auth.getSession()
+    if (error) throw error
+    return data.session
+  },
+
+  async getUser() {
+    const { data, error } = await supabase.auth.getUser()
+    if (error) throw error
+    return data.user
+  },
+
+  onAuthStateChange(callback: (event: string, session: any) => void) {
+    return supabase.auth.onAuthStateChange(callback)
+  },
+}
+
+// Storage helpers
+export const storageHelpers = {
+  async uploadFile(bucket: string, path: string, file: File) {
+    const { data, error } = await supabase.storage.from(bucket).upload(path, file)
+    if (error) throw error
+    return data
+  },
+
+  async getPublicUrl(bucket: string, path: string) {
+    const { data } = supabase.storage.from(bucket).getPublicUrl(path)
+    return data.publicUrl
+  },
+
+  async deleteFile(bucket: string, path: string) {
+    const { error } = await supabase.storage.from(bucket).remove([path])
+    if (error) throw error
+  },
+}
+
+export default supabase

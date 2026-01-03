@@ -1,3 +1,5 @@
+import { useState, useEffect } from 'react';
+
 const DEMO_SENSORS = [
   { id: 'S-101', type: 'Air Quality', location: 'Ward 12', status: 'online', value: 42, unit: 'AQI', last_seen: '2025-12-31T09:00:00Z' },
   { id: 'S-102', type: 'Flood Sensor', location: 'Ward 02', status: 'offline', value: null, unit: '', last_seen: '2025-12-29T20:12:00Z' },
@@ -8,9 +10,40 @@ const DEMO_SENSORS = [
 
 export default function IoTSensors() {
   const onlineCount = DEMO_SENSORS.filter(s => s.status === 'online').length;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
-    <div className="p-6">
+    <div className="p-6 relative">
+      {/* Coming Soon Overlay */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+        <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md text-center">
+          <div className="mb-4">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
+              <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Coming Soon</h2>
+          <p className="text-gray-600 mb-4">
+            IoT Sensor Integration is currently under development. 
+            We're working hard to bring you real-time environmental monitoring.
+          </p>
+          <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span>Expected Release: Q2 2026</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Existing Content (Blurred in Background) */}
+      <div className="blur-sm pointer-events-none">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold">IoT Sensors</h1>
@@ -44,7 +77,9 @@ export default function IoTSensors() {
                   <div className="text-xs text-gray-500">{s.location}</div>
                 </div>
                 <div>
-                  <div className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${s.status === 'online' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{s.status}</div>
+                  <div className={`inline-flex items-center 
+                  Last seen: {mounted ? new Date(s.last_seen).toLocaleString() : s.last_seen}
+                = 'online' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{s.status}</div>
                 </div>
               </div>
 
@@ -56,6 +91,7 @@ export default function IoTSensors() {
             </div>
           ))}
         </div>
+      </div>
       </div>
     </div>
   );

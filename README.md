@@ -1,83 +1,91 @@
-# CivicOp - Civic Issue Reporting Platform
+# GuardTech - Smart City Surveillance & Incident Management
 
-A scalable, event-driven platform for citizens to report civic issues with AI-powered processing and official governance dashboard.
+A scalable, event-driven platform for civic incident reporting with AI-powered processing, real-time monitoring, and official governance dashboard. Built with FastAPI, Next.js, and Supabase.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.12+
+- Python 3.11+
 - Node.js 18+
-- Docker & Docker Compose
-- PostgreSQL (optional, can use Docker)
+- Supabase account (free tier works!)
+- Optional: Docker & Docker Compose for containerized deployment
 
-### 1. Clone and Setup
+### Development Setup (Recommended)
+
+**Fast Setup:**
 ```bash
-git clone <repository-url>
+# Clone repository
+git clone https://github.com/MiCodes2/GuardTech.git
 cd GuardTech
+
+# Run quick start script
+chmod +x quickstart.sh
+./quickstart.sh
 ```
 
-### 2. Environment Setup
+**Manual Setup:**
+1. Copy environment files:
+   ```bash
+   cp backend/.env.example backend/.env
+   cp frontend/.env.local.example frontend/.env.local
+   ```
+
+2. Update with your Supabase credentials (see [DEV_SETUP.md](DEV_SETUP.md))
+
+3. Install dependencies:
+   ```bash
+   # Backend
+   cd backend
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   cd ..
+   
+   # Frontend
+   cd frontend
+   npm install
+   cd ..
+   ```
+
+4. Start development servers:
+   ```bash
+   npm run dev
+   ```
+
+📚 **Detailed Setup Guide**: See [DEV_SETUP.md](DEV_SETUP.md) for complete instructions  
+🔥 **Quick Reference**: See [QUICK_REFERENCE.md](QUICK_REFERENCE.md) for common commands
+
+### Docker Deployment (Alternative)
+
 ```bash
-# Create Python virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install backend dependencies
-pip install -r backend/requirements.txt
-
-# Troubleshooting: If you see "email-validator is not installed" when starting the backend, run:
-# pip install -r backend/requirements.txt
-# or
-# pip install email-validator
-
-# Install frontend dependencies
-cd frontend && npm install && cd ..
-```
-
-### 3. Start Services
-
-#### Option A: Docker Compose (Recommended)
-```bash
-# Start all services
-docker-compose up --build -d
+# Start all services with Docker
+docker-compose up --build
 
 # Check status
 docker-compose ps
-```
-
-#### Option B: Local Development
-```bash
-# Terminal 1: Start PostgreSQL (if not using Docker)
-# PostgreSQL should be running on port 5440
-
-# Terminal 2: Start Backend
-source .venv/bin/activate
-PYTHONPATH=/home/dell/mithilesh/GuardTech/backend uvicorn app.main:app --host 0.0.0.0 --port 8040 --reload
-
-# Terminal 3: Start Frontend
-cd frontend && npm run dev
-
-# Terminal 4: Start Redis (if needed)
-redis-server
 ```
 
 ## 📋 Services & Ports
 
 | Service | Port | URL | Description |
 |---------|------|-----|-------------|
-| **PostgreSQL** | 5440 | `postgresql://civicop_user:civicop_pass@localhost:5440/civicop` | Database with PostGIS |
-| **FastAPI Backend** | 8040 | http://localhost:8040 | REST API |
-| **Next.js Frontend** | 3040 | http://localhost:3040 | Citizen web app |
-| **Redis** | 6389 | `redis://localhost:6389/0` | Message queue |
-| **API Gateway** | 80 | http://localhost:80 | Nginx proxy |
+| **Next.js Frontend** | 3041 | http://localhost:3041 | Web application |
+| **FastAPI Backend** | 8000 | http://localhost:8000 | REST API |
+| **API Documentation** | 8000 | http://localhost:8000/docs | Interactive API docs |
+| **Supabase** | - | Your project URL | Database, Auth, Storage |
+| **Redis** (optional) | 6379 | `redis://localhost:6379` | Cache & queues |
 
 ## 🏗️ Architecture
 
 ### System Components
-- **Frontend**: Next.js PWA for citizen mobile/web app
-- **Backend**: FastAPI for REST API with automatic OpenAPI docs
-- **Worker**: Celery for async AI processing
-- **Queue**: Redis for message queuing
+- **Frontend**: Next.js 14 with React 18, TypeScript, Tailwind CSS
+- **Backend**: FastAPI with async/await, SQLAlchemy, Pydantic
+- **Database**: Supabase (PostgreSQL) with PostGIS for geospatial data
+- **Authentication**: Supabase Auth with JWT
+- **Storage**: Supabase Storage for media files
+- **Real-time**: Supabase Realtime for live updates
+- **Worker**: Celery for async AI/ML processing (optional)
+- **AI/ML**: OpenAI GPT, PyTorch, Transformers
 - **Database**: PostgreSQL with PostGIS for spatial data
 - **Storage**: AWS S3 for images (configured)
 - **AI**: OpenCV/YOLO for image processing, LLM for verification

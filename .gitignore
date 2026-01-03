@@ -55,3 +55,7 @@ docker-compose.override.yml
 # Other
 coverage/
 report/
+
+# Keep example environment files
+!.env.example
+!.env.local.example

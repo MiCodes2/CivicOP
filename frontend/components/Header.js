@@ -60,20 +60,25 @@ export default function Header() {
         </div>
 
         {/* RIGHT: Buttons */}
-        <div className="flex items-center space-x-3 shrink-0">
+        <div className="flex items-center space-x-2 md:space-x-3 shrink-0">
           {!isGovernance && (
             <>
-              <Link href="/governance" className="hidden lg:inline-block bg-water hover:bg-water/90 text-white font-medium py-2 px-4 rounded-lg shadow-sm whitespace-nowrap">
-                Civic Governance Hub
-              </Link>
-              <Link href="/" className="hidden md:inline-block bg-city hover:bg-city/90 text-white font-medium py-2 px-4 rounded-lg shadow-sm transition duration-200 whitespace-nowrap">
-                Report Issue
+              {/* Governance Hub Button - Icon on mobile, text on desktop */}
+              <Link href="/governance" className="bg-water hover:bg-water/90 text-white font-medium py-2 px-3 md:px-4 rounded-lg shadow-sm whitespace-nowrap flex items-center gap-1" title="Civic Governance Hub">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <span className="hidden lg:inline">Civic Governance Hub</span>
               </Link>
             </>
           )}
 
-          <Link href="/login" className="bg-greenspace hover:bg-greenspace/90 text-white font-medium py-2 px-4 rounded-lg shadow-sm whitespace-nowrap">
-            Login
+          {/* Login Button - Icon on mobile, text on desktop */}
+          <Link href="/login" className="bg-greenspace hover:bg-greenspace/90 text-white font-medium py-2 px-3 md:px-4 rounded-lg shadow-sm whitespace-nowrap flex items-center gap-1" title="Login">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+            </svg>
+            <span className="hidden md:inline">Login</span>
           </Link>
         </div>
         
