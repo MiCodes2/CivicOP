@@ -1,19 +1,39 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
-if (!supabaseUrl || !supabaseAnonKey) {
+let supabaseInstance: SupabaseClient | null = null
+
+if (supabaseUrl && supabaseAnonKey) {
+  supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  })
+} else {
   console.warn('Supabase credentials not found. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local')
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+// Export a proxy that handles missing credentials gracefully
+export const supabase = supabaseInstance || ({
   auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
+    signIn: () => Promise.reject(new Error('Supabase not configured')),
+    signOut: () => Promise.reject(new Error('Supabase not configured')),
+    getSession: () => Promise.resolve({ data: { session: null }, error: null }),
   },
-})
+  from: () => ({
+    select: () => ({ data: [], error: null }),
+    insert: () => Promise.reject(new Error('Supabase not configured')),
+    update: () => Promise.reject(new Error('Supabase not configured')),
+    delete: () => Promise.reject(new Error('Supabase not configured')),
+  }),
+  channel: () => ({
+    on: () => ({ subscribe: () => ({ unsubscribe: () => {} }) }),
+  }),
+} as any)
 
 // Database helper functions
 export const dbHelpers = {
