@@ -31,7 +31,7 @@ services:
   backend:
     build: ./backend
     ports:
-      - "8040:8000"
+      - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://civicop_user:civicop_pass@postgres/civicop
       - REDIS_URL=redis://host.docker.internal:6379/0

@@ -5,218 +5,239 @@ A scalable, event-driven platform for civic incident reporting with AI-powered p
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.11+
+- Python 3.8+
 - Node.js 18+
 - Supabase account (free tier works!)
-- Optional: Docker & Docker Compose for containerized deployment
+- Docker & Docker Compose (optional)
 
-### Development Setup (Recommended)
+### Setup
 
-**Fast Setup:**
-```bash
-# Clone repository
-git clone https://github.com/MiCodes2/GuardTech.git
-cd GuardTech
-
-# Run quick start script
-chmod +x quickstart.sh
-./quickstart.sh
-```
-
-**Manual Setup:**
-1. Copy environment files:
+1. **Clone & Install:**
    ```bash
-   cp backend/.env.example backend/.env
-   cp frontend/.env.local.example frontend/.env.local
+   git clone https://github.com/MiCodes2/GuardTech.git
+   cd GuardTech
    ```
 
-2. Update with your Supabase credentials (see [DEV_SETUP.md](DEV_SETUP.md))
-
-3. Install dependencies:
+2. **Backend Setup:**
    ```bash
-   # Backend
    cd backend
    python3 -m venv venv
-   source venv/bin/activate
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements.txt
-   cd ..
-   
-   # Frontend
+   ```
+
+3. **Frontend Setup:**
+   ```bash
    cd frontend
    npm install
-   cd ..
    ```
 
-4. Start development servers:
+4. **Database Setup:**
+   - Create a Supabase project at https://supabase.com
+   - Copy the entire contents of `supabase/schema.sql` into the Supabase SQL Editor
+   - Execute the script
+   - See [Database Migration Guide](supabase/MIGRATION_GUIDE.md) for details
+
+5. **Environment Configuration:**
+   Create `.env` files with your Supabase credentials:
+   - **Backend:** `backend/.env`
+   - **Frontend:** `frontend/.env.local`
+
+6. **Start Servers:**
    ```bash
-   npm run dev
+   # Terminal 1: Backend
+   cd backend
+   source venv/bin/activate
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+   
+   # Terminal 2: Frontend
+   cd frontend
+   npm run dev  # Runs on http://localhost:3000
    ```
 
-📚 **Detailed Setup Guide**: See [DEV_SETUP.md](DEV_SETUP.md) for complete instructions  
-🔥 **Quick Reference**: See [QUICK_REFERENCE.md](QUICK_REFERENCE.md) for common commands
-
-### Docker Deployment (Alternative)
+### Using Docker Compose
 
 ```bash
-# Start all services with Docker
-docker-compose up --build
-
-# Check status
-docker-compose ps
+docker-compose up -d
 ```
 
-## 📋 Services & Ports
+This starts:
+- **Backend API:** http://localhost:8000
+- **Frontend App:** http://localhost:3000
+- **API Docs:** http://localhost:8000/docs
 
-| Service | Port | URL | Description |
-|---------|------|-----|-------------|
-| **Next.js Frontend** | 3041 | http://localhost:3041 | Web application |
-| **FastAPI Backend** | 8000 | http://localhost:8000 | REST API |
-| **API Documentation** | 8000 | http://localhost:8000/docs | Interactive API docs |
-| **Supabase** | - | Your project URL | Database, Auth, Storage |
-| **Redis** (optional) | 6379 | `redis://localhost:6379` | Cache & queues |
+## 📦 Project Structure
 
-## 🏗️ Architecture
-
-### System Components
-- **Frontend**: Next.js 14 with React 18, TypeScript, Tailwind CSS
-- **Backend**: FastAPI with async/await, SQLAlchemy, Pydantic
-- **Database**: Supabase (PostgreSQL) with PostGIS for geospatial data
-- **Authentication**: Supabase Auth with JWT
-- **Storage**: Supabase Storage for media files
-- **Real-time**: Supabase Realtime for live updates
-- **Worker**: Celery for async AI/ML processing (optional)
-- **AI/ML**: OpenAI GPT, PyTorch, Transformers
-- **Database**: PostgreSQL with PostGIS for spatial data
-- **Storage**: AWS S3 for images (configured)
-- **AI**: OpenCV/YOLO for image processing, LLM for verification
-
-### Data Flow
-1. Citizen uploads photo via Next.js app
-2. FastAPI receives request and queues job to Redis
-3. Celery worker picks up job and processes with AI
-4. Validated data stored in PostgreSQL
-5. Real-time updates sent via WebSocket
-
-## 📊 Database Schema
-
-### Core Tables
-- **incidents**: Raw report data with GPS coordinates
-- **ai_analysis**: AI processing results and confidence scores
-- **audit_log**: Complete audit trail of all status changes
-
-### Sample Data
-```sql
--- Database: civicop
--- User: civicop_user
--- Password: civicop_pass
 ```
+GuardTech/
+├── backend/              # FastAPI application
+│   ├── app/
+│   │   ├── api/         # API endpoints
+│   │   ├── models/      # Database models
+│   │   ├── schemas/     # Pydantic schemas
+│   │   ├── services/    # Business logic
+│   │   └── core/        # Configuration & security
+│   └── requirements.txt
+├── frontend/            # Next.js application
+│   ├── pages/          # Page components
+│   ├── components/     # Reusable components
+│   ├── lib/            # Utilities & API clients
+│   └── styles/         # Global styles
+├── worker/             # Celery background tasks
+├── supabase/           # Database migrations
+└── docker-compose.yml  # Container orchestration
+```
+
+## 📊 Database Schema (Supabase)
+
+### Main Tables
+- **civic_issues** - Anonymous civic issue reports
+- **users** - User accounts (citizen/official/admin roles)
+- **wards** - City ward/location reference data
+- **ai_analysis** - AI analysis results for detected issues
+- **audit_logs** - Audit trail of all system changes
+
+### Storage
+- **civic-issue-images** bucket - Issue images (max 5MB per file)
 
 ## 🔧 API Endpoints
 
-### Base URL: http://localhost:8040/api/v1
-
-- `GET /incidents` - List all incidents
-- `GET /incidents/{id}` - Get specific incident
-- `POST /incidents` - Create new incident report
-
-### API Documentation
-Visit http://localhost:8040/docs for interactive API documentation.
-
-## 🐳 Docker Commands
-
-```bash
-# Start all services
-docker-compose up -d
-
-# Start specific service
-docker-compose up postgres -d
-docker-compose up redis -d
-
-# View logs
-docker-compose logs -f backend
-docker-compose logs -f frontend
-
-# Stop services
-docker-compose down
-
-# Rebuild and restart
-docker-compose up --build --force-recreate
+```
+GET    /api/v1/incidents           List all civic issues
+POST   /api/v1/incidents           Submit new civic issue
+GET    /api/v1/incidents/{id}      Get issue details
+PUT    /api/v1/incidents/{id}      Update issue
+GET    /api/v1/users               List users (admin only)
+POST   /api/v1/users               Create new user
+GET    /api/v1/governance/stats    Get governance statistics
 ```
 
-## 🔐 Environment Variables
+Full OpenAPI docs available at: http://localhost:8000/docs
 
-Create a `.env` file in the project root:
+## 🎯 Features
 
+### Backend
+- ✅ FastAPI REST API with async support
+- ✅ Supabase PostgreSQL integration with RLS
+- ✅ Real-time WebSocket updates
+- ✅ Celery background task processing
+- ✅ AI/ML analysis pipeline
+- ✅ Row-level security for data isolation
+- ✅ File upload with storage integration
+
+### Frontend
+- ✅ Next.js with server-side rendering
+- ✅ Real-time data sync via Supabase
+- ✅ Interactive geospatial mapping
+- ✅ Issue submission & tracking
+- ✅ Admin governance dashboard
+- ✅ Responsive design (mobile-first)
+- ✅ Authentication & authorization
+
+## 🔐 Security
+
+- **Row Level Security (RLS)** - Fine-grained access control
+- **Authentication** - JWT tokens for API access
+- **Public Anonymous Submissions** - No login required for issue reporting
+- **Password Hashing** - Industry-standard encryption
+- **Image Validation** - File size and type restrictions
+- **CORS Protection** - Cross-origin request filtering
+
+## 📝 Environment Variables
+
+### Backend (.env)
 ```env
-# Database
-DATABASE_URL=postgresql://civicop_user:civicop_pass@localhost:5440/civicop
-
-# Redis
-REDIS_URL=redis://localhost:6389/0
-
-# AWS S3 (for image storage)
-AWS_ACCESS_KEY_ID=your_access_key
-AWS_SECRET_ACCESS_KEY=your_secret_key
-S3_BUCKET=civicop-images
-
-# API
-SECRET_KEY=your-secret-key-here
-
-# Optional: Theme colors (also add client vars to frontend/.env.local)
-THEME_CITY=#F9A825
-THEME_WATER=#3B99D9
-THEME_TRANSPORT=#D32F2F
-THEME_GREEN=#388E3C
-THEME_BG=#FFFFFF
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-anon-key
+SUPABASE_SERVICE_KEY=your-service-role-key
+DATABASE_URL=postgresql://user:password@host/database
+SECRET_KEY=your-secret-key
+CORS_ORIGINS=http://localhost:3000,http://localhost:3041
 ```
 
-On the frontend, create `frontend/.env.local` with public vars to expose to the browser:
-
+### Frontend (.env.local)
 ```env
-NEXT_PUBLIC_THEME_CITY=#F9A825
-NEXT_PUBLIC_THEME_WATER=#3B99D9
-NEXT_PUBLIC_THEME_TRANSPORT=#D32F2F
-NEXT_PUBLIC_THEME_GREEN=#388E3C
-NEXT_PUBLIC_THEME_BG=#FFFFFF
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
+
+## 📦 Tech Stack
+
+**Backend:**
+- FastAPI (async Python web framework)
+- SQLAlchemy (ORM)
+- Supabase (PostgreSQL database)
+- PostGIS (geospatial queries)
+- Celery (task queue)
+- Redis (caching & message broker)
+
+**Frontend:**
+- Next.js 14 (React framework)
+- TypeScript (type safety)
+- Tailwind CSS (styling)
+- Supabase Client (real-time database)
+- Leaflet (interactive maps)
+
+**Infrastructure:**
+- Docker & Docker Compose
+- PostgreSQL + PostGIS
+- Nginx (reverse proxy)
 
 ## 🧪 Testing
 
 ```bash
 # Backend tests
-cd backend && python -m pytest
+cd backend
+pytest tests/
 
 # Frontend tests
-cd frontend && npm test
+cd frontend
+npm test
 ```
 
 ## 🚀 Deployment
 
-### Production Setup
-1. Configure environment variables
-2. Set up AWS S3 bucket
-3. Configure domain and SSL
-4. Deploy using Docker Compose
-5. Set up monitoring and logging
+### Docker Deployment
+```bash
+docker-compose up -d
+```
 
-### Scaling
-- Use Redis cluster for high availability
-- Scale Celery workers based on load
-- Implement database read replicas
-- Use CDN for static assets
+### Cloud Deployment Options
+- **Vercel** (Frontend)
+- **Railway/Render/Fly.io** (Backend)
+- **Supabase** (Database)
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## 📝 License
+## 📄 License
 
-This project is licensed under the MIT License.
+MIT License - See LICENSE file for details
 
 ## 📞 Support
 
-For questions or issues, please open an issue on GitHub.
+- **API Documentation:** http://localhost:8000/docs
+- **Issue Tracker:** GitHub Issues
+- **Code Comments:** See inline documentation
+
+## 🎯 Project Roadmap
+
+- ✅ Core CRUD operations
+- ✅ Real-time features
+- ✅ Governance dashboard
+- ⏳ Advanced analytics
+- ⏳ Mobile app (iOS/Android)
+- ⏳ ML model improvements
+- ⏳ Email notifications
+
+---
+
+**Last Updated:** January 3, 2026  
+**Version:** 1.0.0  
+**Status:** Active Development
+

@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
+import { supabase } from '../lib/supabase';
 
 export default function Dashboard() {
   const [incidents, setIncidents] = useState([]);
@@ -14,9 +15,13 @@ export default function Dashboard() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('http://localhost:8040/api/v1/incidents/');
-      if (!res.ok) throw new Error('Failed to fetch');
-      const data = await res.json();
+      const { data, error: fetchError } = await supabase
+        .from('civic_issues')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (fetchError) throw fetchError;
       setIncidents(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
