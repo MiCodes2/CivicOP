@@ -563,3 +563,6 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
           </div>
         </div>
       )}
+    </div>
+  )
+}
