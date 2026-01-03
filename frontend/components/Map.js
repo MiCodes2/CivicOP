@@ -15,7 +15,7 @@ if (typeof window !== 'undefined') {
     });
 }
 
-const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => {
+const Map = ({ incidents, userLocation, fillHeight = false, small = false, pulseColor = null }) => {
   const BENGALURU_CENTER = [12.9716, 77.5946];
   const DEFAULT_ZOOM = 11;
   
@@ -124,15 +124,20 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
   };
 
   // Create custom icon based on severity with enhanced styling and animation
-  const createSeverityIcon = (severity) => {
-    const color = getMarkerColor(severity)
+  const createSeverityIcon = (severity, status) => {
+    // If issue is RESOLVED, force green pulse/color regardless of severity
+    const resolvedColor = '#10B981'
+    const color = (status === 'RESOLVED' || status === 'resolved') ? resolvedColor : getMarkerColor(severity)
     const severityLabels = ['', 'Low', 'Minor', 'Medium', 'High', 'Critical']
     const severityLabel = severityLabels[severity] || 'Medium'
-    const emoji = severity >= 4 ? '🚨' : severity === 3 ? '⚠️' : severity === 2 ? '⚡' : '✓'
+    const emoji = status === 'RESOLVED' || status === 'resolved' ? '✅' : (severity >= 4 ? '🚨' : severity === 3 ? '⚠️' : severity === 2 ? '⚡' : '✓')
     
     // More intense animation for high severity
     const animationDuration = severity >= 4 ? '1.2s' : '2s'
-    const pulseOpacity = severity >= 4 ? 0.8 : 0.6
+    const pulseOpacity = status === 'RESOLVED' ? 0.6 : (severity >= 4 ? 0.8 : 0.6)
+
+    // Optional override for pulse color (e.g., home page wants green pulses)
+    const pulse = pulseColor || color;
     
     return L.divIcon({
       className: 'severity-marker-wrapper',
@@ -163,11 +168,11 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
         }
         @keyframes markerPulse {
           0%, 100% { 
-            box-shadow: 0 0 0 0 ${color}66;
+            box-shadow: 0 0 0 0 ${pulse}66;
             opacity: 0.6;
           }
           50% { 
-            box-shadow: 0 0 0 12px ${color}00;
+            box-shadow: 0 0 0 12px ${pulse}00;
             opacity: ${pulseOpacity};
           }
         }
@@ -177,8 +182,8 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
         width: 50px; 
         height: 50px; 
         border-radius: 50%; 
-        background: ${color}22;
-        border: 3px solid ${color}88;
+        background: ${pulse}22;
+        border: 3px solid ${pulse}88;
         opacity: 0.8;
         left: 50%; 
         top: 50%; 
@@ -209,9 +214,9 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
               className: 'leaflet-zoom-animated leaflet-user-location-marker',
               html: `
                 <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 0 6px rgba(30, 64, 175, 0.6)); animation: userLocationPulse 2.5s infinite;">
-                  <circle cx="16" cy="16" r="12" fill="#1E40AF" opacity="0.2" />
-                  <circle cx="16" cy="16" r="10" fill="none" stroke="#1E40AF" stroke-width="1" opacity="0.4" />
-                  <circle cx="16" cy="16" r="8" fill="#3B82F6" />
+                  <circle cx="16" cy="16" r="12" fill="${pulseColor || '#1E40AF'}" opacity="0.2" />
+                  <circle cx="16" cy="16" r="10" fill="none" stroke="${pulseColor || '#1E40AF'}" stroke-width="1" opacity="0.4" />
+                  <circle cx="16" cy="16" r="8" fill="${pulseColor || '#3B82F6'}" />
                   <circle cx="16" cy="16" r="8" fill="none" stroke="#ffffff" stroke-width="3" />
                   <circle cx="16" cy="16" r="4" fill="#ffffff" />
                 </svg>
@@ -231,7 +236,7 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
           </Marker>
         )}
         {incidents && incidents.filter(i => Number.isFinite(i.latitude) && Number.isFinite(i.longitude)).map((incident) => {
-          const customIcon = createSeverityIcon(incident.severity || 3);
+          const customIcon = createSeverityIcon(incident.severity || 3, incident.status);
 
           return (
             <Marker

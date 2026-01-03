@@ -28,14 +28,14 @@ export default function Home() {
     fetchIncidents();
     
     // Set up real-time subscription
-    const subscription = supabase
+    const sub1 = supabase
       .channel('civic_issues_changes')
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'civic_issues' 
       }, (payload) => {
-        console.log('Real-time update:', payload);
+        console.log('Real-time update (civic_issues):', payload);
         if (payload.eventType === 'INSERT') {
           setIncidents(prev => [payload.new, ...prev]);
         } else if (payload.eventType === 'UPDATE') {
@@ -46,8 +46,29 @@ export default function Home() {
       })
       .subscribe();
 
+    let sub2 = null;
+    import('../lib/supabase_helpers').then(({ tableExists }) => {
+      tableExists('incidents').then(available => {
+        if (!available) return
+        sub2 = supabase
+          .channel('incidents_changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, (payload) => {
+            console.log('Real-time update (incidents):', payload);
+            if (payload.eventType === 'INSERT') {
+              setIncidents(prev => [payload.new, ...prev]);
+            } else if (payload.eventType === 'UPDATE') {
+              setIncidents(prev => prev.map(inc => inc.id === payload.new.id ? payload.new : inc));
+            } else if (payload.eventType === 'DELETE') {
+              setIncidents(prev => prev.filter(inc => inc.id !== payload.old.id));
+            }
+          })
+          .subscribe()
+      })
+    })
+
     return () => {
-      subscription.unsubscribe();
+      sub1.unsubscribe();
+      if (sub2) sub2.unsubscribe();
     };
   }, []);
 
@@ -123,7 +144,7 @@ export default function Home() {
               </div>
             </div>
             <div className="flex-1 overflow-hidden min-h-0">
-              <DynamicMap incidents={incidents} userLocation={userLocation} fillHeight />
+              <DynamicMap incidents={incidents} userLocation={userLocation} fillHeight pulseColor="#10B981" />
             </div>
           </div>
 

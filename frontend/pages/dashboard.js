@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { supabase } from '../lib/supabase';
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function Dashboard() {
   const [incidents, setIncidents] = useState([]);
@@ -9,6 +10,41 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchIncidents();
+
+    // Real-time subscription to keep dashboard in sync with governance actions
+    const sub1 = supabase
+      .channel('civic_issues_dashboard')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'civic_issues' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setIncidents(prev => [payload.new, ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          setIncidents(prev => prev.map(inc => inc.id === payload.new.id ? payload.new : inc));
+        } else if (payload.eventType === 'DELETE') {
+          setIncidents(prev => prev.filter(inc => inc.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    let sub2 = null;
+    import('../lib/supabase_helpers').then(({ tableExists }) => {
+      tableExists('incidents').then(available => {
+        if (!available) return
+        sub2 = supabase
+          .channel('incidents_dashboard')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, (payload) => {
+            if (payload.eventType === 'INSERT') {
+              setIncidents(prev => [payload.new, ...prev]);
+            } else if (payload.eventType === 'UPDATE') {
+              setIncidents(prev => prev.map(inc => inc.id === payload.new.id ? payload.new : inc));
+            } else if (payload.eventType === 'DELETE') {
+              setIncidents(prev => prev.filter(inc => inc.id !== payload.old.id));
+            }
+          })
+          .subscribe()
+      })
+    })
+
+    return () => { sub1.unsubscribe(); if (sub2) sub2.unsubscribe(); };
   }, []);
 
   const fetchIncidents = async () => {
@@ -40,11 +76,18 @@ export default function Dashboard() {
     const c = (i.category || 'other').toLowerCase(); acc[c] = (acc[c] || 0) + 1; return acc;
   }, {}), [incidents]);
 
+  const severityCounts = useMemo(() => incidents.reduce((acc, i) => {
+    const sev = i.severity || 3; 
+    acc[sev] = (acc[sev] || 0) + 1; 
+    return acc;
+  }, {}), [incidents]);
+
   const recent = incidents.slice().sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).slice(0,6);
 
+  // Data for charts
   const last7 = useMemo(() => {
     const days = Array.from({length:7}).map((_,i) => {
-      const d = new Date(); d.setDate(d.getDate()-i); d.setHours(0,0,0,0); return {date:d, key:d.toISOString().slice(0,10), count:0};
+      const d = new Date(); d.setDate(d.getDate()-i); d.setHours(0,0,0,0); return {date:d, key:d.toISOString().slice(0,10), count:0, label: new Date(d).toLocaleDateString(undefined, {month:'short', day:'numeric'})};
     }).reverse();
     incidents.forEach(i => {
       const k = (new Date(i.created_at)).toISOString().slice(0,10);
@@ -53,6 +96,30 @@ export default function Dashboard() {
     });
     return days;
   }, [incidents]);
+
+  const categoryData = useMemo(() => 
+    Object.entries(categoryCounts)
+      .sort((a,b)=>b[1]-a[1])
+      .slice(0,6)
+      .map(([name, value]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), value })),
+    [categoryCounts]
+  );
+
+  const severityData = useMemo(() => {
+    const labels = ['Low', 'Minor', 'Medium', 'High', 'Critical'];
+    return Array.from({length:5}).map((_, i) => ({
+      name: labels[i],
+      value: severityCounts[i+1] || 0
+    }));
+  }, [severityCounts]);
+
+  const statusData = useMemo(() => 
+    Object.entries(statusCounts)
+      .map(([name, value]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), value })),
+    [statusCounts]
+  );
+
+  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
   const statusOrder = ['reported','processing','assigned','verified','resolved'];
 
@@ -69,53 +136,66 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="col-span-2 bg-white rounded-lg border p-4 shadow-sm">
-          <h2 className="font-semibold mb-3">Summary</h2>
+        <div className="col-span-2 bg-white rounded-lg border p-6 shadow-sm space-y-6">
+          <div>
+            <h2 className="font-semibold mb-4 text-lg">Summary</h2>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="p-3 bg-gray-50 rounded">
-              <div className="text-sm text-gray-500">Total Reports</div>
-              <div className="text-2xl font-bold">{total}</div>
-            </div>
-
-            {statusOrder.map((s) => (
-              <div key={s} className="p-3 bg-gray-50 rounded">
-                <div className="text-sm text-gray-500">{s.charAt(0).toUpperCase()+s.slice(1)}</div>
-                <div className="text-2xl font-bold">{statusCounts[s] || 0}</div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+              <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                <div className="text-sm text-blue-600 font-medium">Total Reports</div>
+                <div className="text-3xl font-bold text-blue-900">{total}</div>
               </div>
-            ))}
-          </div>
 
-          <div className="mt-4">
-            <h3 className="text-sm font-medium mb-2">Last 7 days</h3>
-            <div className="w-full h-20 flex items-end space-x-2">
-              {last7.map(d => (
-                <div key={d.key} className="flex-1">
-                  <div style={{height: `${Math.max(6, (d.count / (Math.max(1, Math.max(...last7.map(x => x.count))))||1) * 100)}%`}} className="bg-water rounded-t" />
-                  <div className="text-[10px] text-gray-500 text-center mt-1">{new Date(d.date).toLocaleDateString(undefined, {month:'short', day:'numeric'})}</div>
+              {statusOrder.map((s) => (
+                <div key={s} className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200">
+                  <div className="text-sm text-gray-600 font-medium">{s.charAt(0).toUpperCase()+s.slice(1)}</div>
+                  <div className="text-2xl font-bold text-gray-900">{statusCounts[s] || 0}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="mt-6">
-            <h3 className="text-sm font-medium mb-2">By Category</h3>
-            <div className="space-y-2">
-              {Object.entries(categoryCounts).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([cat, cnt]) => {
-                const pct = Math.round((cnt / (total || 1)) * 100);
-                return (
-                  <div key={cat} className="flex items-center space-x-3">
-                    <div className="w-36 text-sm text-gray-700 capitalize">{cat}</div>
-                    <div className="flex-1 bg-gray-100 h-3 rounded overflow-hidden">
-                      <div className="h-full bg-water" style={{width: `${pct}%`}} />
-                    </div>
-                    <div className="w-12 text-right text-sm text-gray-700">{cnt}</div>
-                  </div>
-                );
-              })}
-            </div>
+          {/* Trend Chart - Last 7 Days */}
+          <div>
+            <h3 className="text-sm font-semibold mb-3">Reports Trend (Last 7 Days)</h3>
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={last7}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="label" fontSize={12} />
+                <YAxis fontSize={12} />
+                <Tooltip />
+                <Line type="monotone" dataKey="count" stroke="#3B82F6" strokeWidth={2} dot={{ fill: '#3B82F6', r: 4 }} activeDot={{ r: 6 }} name="Reports" />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
 
+          {/* Category Distribution */}
+          <div>
+            <h3 className="text-sm font-semibold mb-3">Issues by Category</h3>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={categoryData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" fontSize={12} />
+                <YAxis fontSize={12} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#3B82F6" name="Count" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Severity Distribution */}
+          <div>
+            <h3 className="text-sm font-semibold mb-3">Issues by Severity</h3>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={severityData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" fontSize={12} />
+                <YAxis fontSize={12} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#10B981" name="Count" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         <div className="bg-white rounded-lg border p-4 shadow-sm">
