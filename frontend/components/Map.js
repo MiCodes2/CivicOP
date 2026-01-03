@@ -16,8 +16,12 @@ if (typeof window !== 'undefined') {
 }
 
 const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => {
-  const [center, setCenter] = useState([12.9716, 77.5946]); // Default to Bengaluru
-  const [detectedLocation, setDetectedLocation] = useState(null);
+  const BENGALURU_CENTER = [12.9716, 77.5946];
+  const DEFAULT_ZOOM = 11;
+  
+  const [center, setCenter] = useState(BENGALURU_CENTER); // Default to Bengaluru city center
+  const [userLocation_detected, setUserLocation] = useState(null);
+  const [locationError, setLocationError] = useState(null);
 
   // === HEIGHT LOGIC ===
   // 1. If fillHeight is true (passed from App.js), use 'h-full' to fill the flex container exactly.
@@ -27,23 +31,57 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
     ? 'h-full' 
     : (small ? "h-[411px] md:h-[771px]" : 'h-[643px] md:h-[1004px]');
 
-  // Detect user location (just for marker, not for centering map)
-  // Keep default Bengaluru city-wide view
-  useEffect(() => {
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const loc = [pos.coords.latitude, pos.coords.longitude];
-          // Store location for marker only - DON'T recenter map
-          setDetectedLocation(loc);
-        },
-        (err) => {
-          // permission denied or error — keep default center
-          console.warn('Geolocation error:', err);
-        },
-        { enableHighAccuracy: false, maximumAge: 60 * 1000 }
-      );
+  /**
+   * Custom function to detect user's current location and create blue marker
+   * Map stays at Bengaluru city center view, blue dot shows user location
+   */
+  const detectUserLocation = () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      console.warn('Geolocation not supported');
+      setLocationError('Geolocation not supported');
+      return;
     }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        // Successfully got user location
+        const { latitude, longitude, accuracy } = position.coords;
+        const userLoc = [latitude, longitude];
+        
+        console.log(`📍 User Location Detected: [${latitude.toFixed(4)}, ${longitude.toFixed(4)}], Accuracy: ${accuracy.toFixed(0)}m`);
+        setUserLocation(userLoc);
+        setLocationError(null);
+      },
+      (error) => {
+        // Handle geolocation errors gracefully
+        let errorMsg = '';
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMsg = 'Location permission denied. Enable location access to see your position.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMsg = 'Location information unavailable.';
+            break;
+          case error.TIMEOUT:
+            errorMsg = 'Location request timeout.';
+            break;
+          default:
+            errorMsg = 'Error detecting location.';
+        }
+        console.warn(`Location Error: ${errorMsg}`);
+        setLocationError(errorMsg);
+      },
+      {
+        enableHighAccuracy: false,
+        maximumAge: 60 * 1000, // Cache location for 1 minute
+        timeout: 10 * 1000 // 10 second timeout
+      }
+    );
+  };
+
+  // Detect user location on component mount
+  useEffect(() => {
+    detectUserLocation();
   }, []);
 
   // Small helper to programmatically recenter the map when the center state updates
@@ -152,23 +190,30 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
 
   return (
     <div className={`relative ${sizeClass} w-full rounded-lg shadow-sm border border-gray-200 overflow-hidden`}>
-      <MapContainer center={center} zoom={11} style={{ height: '100%', width: '100%' }}>
+      <MapContainer center={BENGALURU_CENTER} zoom={DEFAULT_ZOOM} style={{ height: '100%', width: '100%' }}>
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='© OpenStreetMap contributors'
         />
-        {center && (
+        
+        {/* User's Current Location - Blue Pulsing Dot (like Google Maps) */}
+        {userLocation_detected && (
           <Marker
-            position={center}
+            position={userLocation_detected}
             icon={L.divIcon({
-              className: 'user-location',
-              html: `<div class="user-location-pin"></div>`,
-              iconSize: [24, 36],
-              iconAnchor: [12, 36],
+              className: 'user-current-location',
+              html: `<div class="user-location-blue-dot"></div>`,
+              iconSize: [28, 28],
+              iconAnchor: [14, 14],
             })}
-            zIndexOffset={2000}
+            zIndexOffset={1000}
           >
-            <Popup>You are here</Popup>
+            <Popup className="user-location-popup">
+              <div className="text-sm font-semibold text-blue-600">📍 Your Location</div>
+              <div className="text-xs text-gray-600">
+                {userLocation_detected[0].toFixed(4)}, {userLocation_detected[1].toFixed(4)}
+              </div>
+            </Popup>
           </Marker>
         )}
         {incidents && incidents.filter(i => Number.isFinite(i.latitude) && Number.isFinite(i.longitude)).map((incident) => {
@@ -274,6 +319,18 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
           100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
         }
         
+        @keyframes userLocationPulse {
+          0% {
+            box-shadow: 0 0 0 0 rgba(59, 153, 217, 0.7);
+          }
+          70% {
+            box-shadow: 0 0 0 12px rgba(59, 153, 217, 0);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(59, 153, 217, 0);
+          }
+        }
+        
         .severity-marker-bounce {
           animation: bounce 2s infinite ease-in-out;
         }
@@ -317,30 +374,37 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
           filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
         }
 
-        /* Floating blue pin for user location */
-        .user-location-pin {
-          position: relative;
-          width: 20px;
-          height: 20px;
-          background: linear-gradient(135deg, #3B99D9, #2563eb);
-          transform: rotate(-45deg);
-          border-radius: 50% 50% 50% 0;
-          border: 3px solid #ffffff;
-          box-shadow: 0 4px 12px rgba(59,153,217,0.4);
-          animation: pulse 2s infinite;
+        /* User's current location - Blue pulsing dot like Google Maps */
+        .user-current-location {
+          z-index: 1000 !important;
         }
         
-        .user-location-pin::after {
+        .user-location-blue-dot {
+          position: relative;
+          width: 22px;
+          height: 22px;
+          background: linear-gradient(135deg, #3B99D9, #2563eb);
+          border-radius: 50%;
+          border: 4px solid #ffffff;
+          box-shadow: 0 2px 8px rgba(37, 99, 235, 0.5);
+          animation: userLocationPulse 2s infinite;
+        }
+        
+        .user-location-blue-dot::before {
           content: '';
           position: absolute;
           left: 50%;
-          top: 42%;
-          transform: translate(-50%, -50%) rotate(45deg);
-          width: 6px;
-          height: 6px;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          width: 8px;
+          height: 8px;
           background: #ffffff;
           border-radius: 50%;
-          box-shadow: inset 0 0 3px rgba(0,0,0,0.2);
+          box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+        }
+        
+        .user-location-popup {
+          border-radius: 8px;
         }
         
         /* Leaflet marker hover effect */

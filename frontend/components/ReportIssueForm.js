@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase, storageHelpers } from '../lib/supabase'
+import MapComponent from './MapComponent'
 
 const CATEGORIES = [
   { value: 'Pothole', label: 'Pothole', icon: '🕳️' },
@@ -444,18 +445,31 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
               </button>
             </div>
             
-            {/* Or use current location */}
-            <div className="mt-3">
+            {/* Location Selection Options */}
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              {/* Current Location Button */}
               <button
                 type="button"
                 onClick={handleLocationClick}
-                className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition flex items-center justify-center gap-2"
+                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition flex items-center justify-center gap-2"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                Or Use My Current Location
+                My Location
+              </button>
+              
+              {/* Select on Map Button */}
+              <button
+                type="button"
+                onClick={() => setShowMap(true)}
+                className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 003 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6.553 3.276A1 1 0 0021 19.382V8.618a1 1 0 00-1.447-.894L15 10m0 0V5m0 8v8m6-6V5m0 8v8" />
+                </svg>
+                Select on Map
               </button>
             </div>
             
@@ -501,6 +515,51 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
           </div>
         </form>
       </div>
-    </div>
-  )
-}
+
+      {/* Map Selection Modal */}
+      {showMap && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-purple-50 to-purple-100 border-b border-purple-200 px-6 py-4 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-gray-900">Select Location on Map</h3>
+              <button
+                onClick={() => setShowMap(false)}
+                className="text-gray-500 hover:text-gray-700 transition"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Content with Map */}
+            <div className="flex-1 overflow-y-auto">
+              <MapComponent
+                onLocationSelect={(lat, lon) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    latitude: lat,
+                    longitude: lon,
+                    address: `${lat.toFixed(6)}, ${lon.toFixed(6)}`
+                  }))
+                  setShowMap(false)
+                  setError(null)
+                }}
+                selectedLocation={formData.latitude && formData.longitude ? [formData.latitude, formData.longitude] : null}
+              />
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-gray-50 border-t border-gray-200 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setShowMap(false)}
+                className="w-full px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition"
+              >
+                Close Map
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
