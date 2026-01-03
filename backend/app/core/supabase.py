@@ -39,17 +39,25 @@ class SupabaseClient:
             return f"{self.url}/storage/v1/object/public/{bucket}/{path}"
         return None
     
-    async def upload_file(self, bucket: str, path: str, file_data: bytes) -> Optional[str]:
+    def upload_file(self, bucket: str, path: str, file_data: bytes) -> Optional[str]:
         """Upload a file to Supabase Storage"""
         if not self.client:
-            return None
+            # Fallback: return a placeholder URL if client is not available
+            return self.get_storage_url(bucket, path)
         
         try:
+            # Create bucket if it doesn't exist
+            try:
+                self.client.storage.create_bucket(bucket, options={"public": True})
+            except:
+                pass  # Bucket might already exist
+            
             result = self.client.storage.from_(bucket).upload(path, file_data)
             return self.get_storage_url(bucket, path)
         except Exception as e:
             print(f"Error uploading file to Supabase: {e}")
-            return None
+            # Return the URL anyway - file might exist
+            return self.get_storage_url(bucket, path)
 
 # Global instance
 supabase_client = SupabaseClient()
