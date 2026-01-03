@@ -32,11 +32,18 @@ A scalable, event-driven platform for civic incident reporting with AI-powered p
    npm install
    ```
 
-4. **Environment Configuration:**
-   - Backend: `/workspaces/GuardTech/backend/.env` (Supabase credentials included)
-   - Frontend: `/workspaces/GuardTech/frontend/.env.local` (Supabase credentials included)
+4. **Database Setup:**
+   - Create a Supabase project at https://supabase.com
+   - Copy the entire contents of `supabase/schema.sql` into the Supabase SQL Editor
+   - Execute the script
+   - See [Database Migration Guide](supabase/MIGRATION_GUIDE.md) for details
 
-5. **Start Servers:**
+5. **Environment Configuration:**
+   Create `.env` files with your Supabase credentials:
+   - **Backend:** `backend/.env`
+   - **Frontend:** `frontend/.env.local`
+
+6. **Start Servers:**
    ```bash
    # Terminal 1: Backend
    cd backend
@@ -48,126 +55,165 @@ A scalable, event-driven platform for civic incident reporting with AI-powered p
    npm run dev  # Runs on http://localhost:3000
    ```
 
-## 📦 What's Included
+### Using Docker Compose
 
-### Database Schema (Supabase)
-- **civic_issues** - Anonymous issue reporting (main table)
-- **users** - User accounts (citizen/official/admin)
-- **wards** - City ward/location data
-- **ai_analysis** - AI analysis results
-- **audit_logs** - Audit trail
-- **Storage** - `civic-issue-images` bucket (5MB per file)
-
-### Backend Features
-- FastAPI REST API
-- Supabase PostgreSQL integration
-- Row Level Security (RLS) for data protection
-- WebSocket support for real-time updates
-- Task scheduling with Celery
-- AI/ML processing pipeline
-
-### Frontend Features
-- Next.js with TypeScript
-- Real-time data fetching with Supabase
-- Interactive maps with location tracking
-- Issue submission & tracking
-- Admin dashboard
-- Responsive design with Tailwind CSS
-
-## 🔧 API Endpoints
-
-```
-GET    /api/v1/incidents          - List all civic issues
-POST   /api/v1/incidents          - Submit new issue
-GET    /api/v1/incidents/{id}     - Get issue details
-PUT    /api/v1/incidents/{id}     - Update issue
-GET    /api/v1/incidents/{id}/ai  - Get AI analysis
-```
-
-## 🗄️ Database Schema
-
-**civic_issues table:**
-- `id` (UUID) - Unique identifier
-- `title` (TEXT) - Issue title
-- `description` (TEXT) - Detailed description
-- `category` (TEXT) - Issue category
-- `severity` (INTEGER 1-5) - Severity level
-- `status` (TEXT) - OPEN/IN_PROGRESS/RESOLVED/CLOSED
-- `latitude/longitude` (DOUBLE) - Location
-- `address` (TEXT) - Full address
-- `image_url` (TEXT) - URL of uploaded image
-- `created_at/updated_at` (TIMESTAMP) - Timestamps
-- `location` (GEOGRAPHY) - PostGIS geospatial data
-
-**users table:**
-- `id` (UUID) - Unique identifier
-- `email` (VARCHAR) - Email (unique)
-- `hashed_password` (VARCHAR) - Encrypted password
-- `full_name` (VARCHAR) - User's name
-- `role` (VARCHAR) - citizen/official/admin
-- `is_active` (BOOLEAN) - Account status
-
-## 🔐 Security
-
-- Row Level Security (RLS) on all tables
-- Public anonymous issue submission
-- Authenticated user features
-- Admin-only actions
-- Image storage with size limits
-- Secure password hashing
-
-## 📝 Configuration
-
-### Backend .env
-```
-SUPABASE_URL=https://pzopyqzogbumlvjmtecw.supabase.co
-SUPABASE_KEY=<your-anon-key>
-SUPABASE_SERVICE_KEY=<your-service-key>
-DATABASE_URL=postgresql://postgres...
-```
-
-### Frontend .env.local
-```
-NEXT_PUBLIC_SUPABASE_URL=https://pzopyqzogbumlvjmtecw.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
-```
-
-## 🚀 Deployment
-
-### Docker (Recommended)
 ```bash
 docker-compose up -d
 ```
 
-Starts:
-- Backend on http://localhost:8000
-- Frontend on http://localhost:3000
-- Nginx on http://localhost:80
+This starts:
+- **Backend API:** http://localhost:8000
+- **Frontend App:** http://localhost:3000
+- **API Docs:** http://localhost:8000/docs
 
-### Manual Deployment
-See deployment guides in your hosting provider documentation.
+## 📦 Project Structure
+
+```
+GuardTech/
+├── backend/              # FastAPI application
+│   ├── app/
+│   │   ├── api/         # API endpoints
+│   │   ├── models/      # Database models
+│   │   ├── schemas/     # Pydantic schemas
+│   │   ├── services/    # Business logic
+│   │   └── core/        # Configuration & security
+│   └── requirements.txt
+├── frontend/            # Next.js application
+│   ├── pages/          # Page components
+│   ├── components/     # Reusable components
+│   ├── lib/            # Utilities & API clients
+│   └── styles/         # Global styles
+├── worker/             # Celery background tasks
+├── supabase/           # Database migrations
+└── docker-compose.yml  # Container orchestration
+```
+
+## 📊 Database Schema (Supabase)
+
+### Main Tables
+- **civic_issues** - Anonymous civic issue reports
+- **users** - User accounts (citizen/official/admin roles)
+- **wards** - City ward/location reference data
+- **ai_analysis** - AI analysis results for detected issues
+- **audit_logs** - Audit trail of all system changes
+
+### Storage
+- **civic-issue-images** bucket - Issue images (max 5MB per file)
+
+## 🔧 API Endpoints
+
+```
+GET    /api/v1/incidents           List all civic issues
+POST   /api/v1/incidents           Submit new civic issue
+GET    /api/v1/incidents/{id}      Get issue details
+PUT    /api/v1/incidents/{id}      Update issue
+GET    /api/v1/users               List users (admin only)
+POST   /api/v1/users               Create new user
+GET    /api/v1/governance/stats    Get governance statistics
+```
+
+Full OpenAPI docs available at: http://localhost:8000/docs
+
+## 🎯 Features
+
+### Backend
+- ✅ FastAPI REST API with async support
+- ✅ Supabase PostgreSQL integration with RLS
+- ✅ Real-time WebSocket updates
+- ✅ Celery background task processing
+- ✅ AI/ML analysis pipeline
+- ✅ Row-level security for data isolation
+- ✅ File upload with storage integration
+
+### Frontend
+- ✅ Next.js with server-side rendering
+- ✅ Real-time data sync via Supabase
+- ✅ Interactive geospatial mapping
+- ✅ Issue submission & tracking
+- ✅ Admin governance dashboard
+- ✅ Responsive design (mobile-first)
+- ✅ Authentication & authorization
+
+## 🔐 Security
+
+- **Row Level Security (RLS)** - Fine-grained access control
+- **Authentication** - JWT tokens for API access
+- **Public Anonymous Submissions** - No login required for issue reporting
+- **Password Hashing** - Industry-standard encryption
+- **Image Validation** - File size and type restrictions
+- **CORS Protection** - Cross-origin request filtering
+
+## 📝 Environment Variables
+
+### Backend (.env)
+```env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-anon-key
+SUPABASE_SERVICE_KEY=your-service-role-key
+DATABASE_URL=postgresql://user:password@host/database
+SECRET_KEY=your-secret-key
+CORS_ORIGINS=http://localhost:3000,http://localhost:3041
+```
+
+### Frontend (.env.local)
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+## 📦 Tech Stack
+
+**Backend:**
+- FastAPI (async Python web framework)
+- SQLAlchemy (ORM)
+- Supabase (PostgreSQL database)
+- PostGIS (geospatial queries)
+- Celery (task queue)
+- Redis (caching & message broker)
+
+**Frontend:**
+- Next.js 14 (React framework)
+- TypeScript (type safety)
+- Tailwind CSS (styling)
+- Supabase Client (real-time database)
+- Leaflet (interactive maps)
+
+**Infrastructure:**
+- Docker & Docker Compose
+- PostgreSQL + PostGIS
+- Nginx (reverse proxy)
 
 ## 🧪 Testing
 
-### Backend Tests
 ```bash
+# Backend tests
 cd backend
 pytest tests/
-```
 
-### Frontend Tests
-```bash
+# Frontend tests
 cd frontend
 npm test
 ```
 
+## 🚀 Deployment
+
+### Docker Deployment
+```bash
+docker-compose up -d
+```
+
+### Cloud Deployment Options
+- **Vercel** (Frontend)
+- **Railway/Render/Fly.io** (Backend)
+- **Supabase** (Database)
+
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## 📄 License
 
@@ -175,43 +221,23 @@ MIT License - See LICENSE file for details
 
 ## 📞 Support
 
-- Issue Tracker: GitHub Issues
-- Documentation: See inline code comments
-- API Docs: http://localhost:8000/docs (when backend is running)
+- **API Documentation:** http://localhost:8000/docs
+- **Issue Tracker:** GitHub Issues
+- **Code Comments:** See inline documentation
 
-## 🎯 Project Status
+## 🎯 Project Roadmap
 
-✅ Schema & Database Setup
-✅ Backend API
-✅ Frontend Application
-✅ Real-time Features
-✅ Storage Integration
-⏳ Advanced Analytics
-⏳ Mobile App
-
-## 📚 Tech Stack
-
-**Backend:**
-- FastAPI (Python)
-- Supabase (PostgreSQL)
-- PostGIS (Geospatial)
-- Celery (Task Queue)
-- Redis (Caching)
-
-**Frontend:**
-- Next.js (React)
-- TypeScript
-- Tailwind CSS
-- Supabase Client
-- Leaflet Maps
-
-**Infrastructure:**
-- Docker
-- Docker Compose
-- Nginx
-- GitHub Actions (CI/CD)
+- ✅ Core CRUD operations
+- ✅ Real-time features
+- ✅ Governance dashboard
+- ⏳ Advanced analytics
+- ⏳ Mobile app (iOS/Android)
+- ⏳ ML model improvements
+- ⏳ Email notifications
 
 ---
 
-**Last Updated:** January 3, 2026
-**Version:** 1.0.0
+**Last Updated:** January 3, 2026  
+**Version:** 1.0.0  
+**Status:** Active Development
+
