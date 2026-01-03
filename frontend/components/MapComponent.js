@@ -11,24 +11,138 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
+// Bengaluru bounds
+const BENGALURU_BOUNDS = {
+  minLat: 12.7,
+  maxLat: 13.2,
+  minLng: 77.3,
+  maxLng: 77.9,
+};
+
+const isWithinBengaluru = (lat, lon) => {
+  return (
+    lat >= BENGALURU_BOUNDS.minLat &&
+    lat <= BENGALURU_BOUNDS.maxLat &&
+    lon >= BENGALURU_BOUNDS.minLng &&
+    lon <= BENGALURU_BOUNDS.maxLng
+  );
+};
+
 const MapComponent = ({ onLocationSelect, selectedLocation }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [error, setError] = useState('');
+
   const handleMapClick = (e) => {
     const { lat, lng } = e.latlng;
-    onLocationSelect(lat, lng);
+    if (isWithinBengaluru(lat, lng)) {
+      onLocationSelect(lat, lng);
+    } else {
+      setError('Please select a location within Bengaluru city limits');
+    }
+  };
+
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    setSearching(true);
+    setError('');
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          searchQuery + ', Bengaluru, Karnataka, India'
+        )}&limit=5`,
+        { signal: AbortSignal.timeout(10000) }
+      );
+      const data = await response.json();
+
+      // Filter to only Bengaluru locations
+      const bengaluruResults = data.filter((result) =>
+        isWithinBengaluru(parseFloat(result.lat), parseFloat(result.lon))
+      );
+
+      if (bengaluruResults.length === 0) {
+        setError('No locations found in Bengaluru. Please try a different search.');
+        setSearchResults([]);
+      } else {
+        setSearchResults(bengaluruResults);
+      }
+    } catch (err) {
+      setError('Could not search locations. Please try again.');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleSelectSearchResult = (result) => {
+    onLocationSelect(parseFloat(result.lat), parseFloat(result.lon));
+    setSearchQuery('');
+    setSearchResults([]);
   };
 
   return (
-    <MapContainer center={[12.9716, 77.5946]} zoom={10} style={{ height: '100%', width: '100%' }} onClick={handleMapClick}>
-      <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='© OpenStreetMap contributors'
-      />
-      {selectedLocation && (
-        <Marker position={selectedLocation}>
-          <Popup>Selected Location</Popup>
-        </Marker>
-      )}
-    </MapContainer>
+    <div className="flex flex-col h-full">
+      {/* Search Bar */}
+      <div className="p-4 bg-white border-b z-10">
+        <form onSubmit={handleSearch} className="space-y-2">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search for location in Bengaluru..."
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          <button
+            type="submit"
+            disabled={searching}
+            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
+          >
+            {searching ? 'Searching...' : 'Search'}
+          </button>
+        </form>
+
+        {error && (
+          <div className="mt-2 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
+            {error}
+          </div>
+        )}
+
+        {/* Search Results */}
+        {searchResults.length > 0 && (
+          <div className="mt-2 bg-white border border-gray-200 rounded-lg max-h-40 overflow-y-auto">
+            {searchResults.map((result, idx) => (
+              <button
+                key={idx}
+                onClick={() => handleSelectSearchResult(result)}
+                className="w-full text-left px-4 py-2 hover:bg-gray-100 border-b last:border-b-0 text-sm"
+              >
+                <div className="font-medium text-gray-900">{result.name || result.display_name}</div>
+                <div className="text-xs text-gray-500 truncate">{result.display_name}</div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <p className="text-xs text-gray-600 mt-2">📍 Click on the map or search to select a location in Bengaluru</p>
+      </div>
+
+      {/* Map */}
+      <div className="flex-1">
+        <MapContainer center={[12.9716, 77.5946]} zoom={11} style={{ height: '100%', width: '100%' }} onClick={handleMapClick}>
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='© OpenStreetMap contributors'
+          />
+          {selectedLocation && (
+            <Marker position={selectedLocation}>
+              <Popup>Selected Location</Popup>
+            </Marker>
+          )}
+        </MapContainer>
+      </div>
+    </div>
   );
 };
 

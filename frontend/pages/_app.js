@@ -74,9 +74,18 @@ export default function App({ Component, pageProps }) {
                </div>
             </aside>
             
+            {/* Mobile Navigation Bar */}
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center h-16 z-40">
+              <MobileNavButton icon="📊" label="Dashboard" href="/dashboard" />
+              <MobileNavButton icon="🗺️" label="Map" href="/map-view" />
+              <MobileNavButton icon="🎫" label="Tickets" href="/tickets" />
+              <MobileNavButton icon="🤖" label="AI" href="/ai-hub" />
+              <MobileNavButton icon="📡" label="IoT" href="/iot-sensors" />
+            </nav>
+            
             {/* Main Content (Scrolls independently) */}
             {/* We pass 'fillHeight' prop to the child component */}
-            <main className="flex-1 w-full min-w-0 pl-0 pr-0 pb-0 bg-gray-50/50 overflow-y-auto flex flex-col">
+            <main className="flex-1 w-full min-w-0 pl-0 pr-0 pb-0 bg-gray-50/50 overflow-y-auto flex flex-col md:pb-0 pb-20">
               <Component {...pageProps} fillHeight={true} />
             </main>
           </div>
@@ -103,6 +112,20 @@ function NavButton({ icon, label }) {
       <a className={`w-full flex items-center space-x-3 pl-4 pr-0 py-3 rounded-lg text-left transition-colors font-medium ${active ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-blue-50 hover:text-blue-700'}`}>
         <span className="text-xl">{icon}</span>
         <span>{label}</span>
+      </a>
+    </Link>
+  );
+}
+
+function MobileNavButton({ icon, label, href }) {
+  const router = useRouter();
+  const active = router.pathname === href;
+
+  return (
+    <Link href={href} legacyBehavior>
+      <a className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${active ? 'text-blue-600 bg-blue-50' : 'text-gray-600'}`} title={label}>
+        <span className="text-2xl">{icon}</span>
+        <span className="text-xs mt-0.5 font-medium">{label}</span>
       </a>
     </Link>
   );

@@ -44,3 +44,69 @@ html, body {
 .leaflet-popup-content {
   margin: 0 !important;
 }
+
+/* Map Marker Animations */
+@keyframes markerBounce {
+  0%, 100% { 
+    transform: rotate(-45deg) scale(1);
+  }
+  50% { 
+    transform: rotate(-45deg) scale(1.15);
+  }
+}
+
+@keyframes markerPulse {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+    opacity: 0.6;
+  }
+  50% { 
+    box-shadow: 0 0 0 15px rgba(220, 38, 38, 0);
+    opacity: 0.8;
+  }
+}
+
+@keyframes markerGlow {
+  0%, 100% { 
+    filter: drop-shadow(0 0 4px rgba(220, 38, 38, 0.6));
+  }
+  50% { 
+    filter: drop-shadow(0 0 12px rgba(220, 38, 38, 1));
+  }
+}
+
+.severity-marker-container {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  animation: markerGlow 2s ease-in-out infinite;
+}
+
+.severity-marker-bounce {
+  animation: markerBounce 2s ease-in-out infinite;
+}
+
+/* User location pin styles */
+.user-location-pin {
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, #3B99D9 0%, #2563eb 100%);
+  border-radius: 50%;
+  border: 4px solid white;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.5);
+  animation: userLocationPulse 2s ease-in-out infinite;
+}
+
+@keyframes userLocationPulse {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.5);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 2px 16px rgba(37, 99, 235, 0.8);
+    transform: scale(1.1);
+  }
+}
+
+/* Attractive map tile layer */
+.leaflet-tile-pane {
+  filter: brightness(0.98) contrast(1.05);
+}

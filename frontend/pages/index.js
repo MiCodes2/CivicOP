@@ -53,16 +53,25 @@ export default function Home() {
 
   const fetchIncidents = async () => {
     try {
+      // Force fresh data - add timestamp to bypass any caching
+      const timestamp = new Date().getTime();
       const { data, error } = await supabase
         .from('civic_issues')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(100)
+        .throwOnError();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+      
+      console.log('Fetched incidents:', data?.length, 'at', new Date().toISOString());
       setIncidents(data || []);
     } catch (error) {
       console.error('Error fetching incidents:', error);
+      setIncidents([]);
     }
   };
 
@@ -100,9 +109,18 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full w-full px-4 py-3 md:px-4 md:py-3">
           {/* Map Section */}
           <div className="bg-white rounded-lg shadow-sm border flex flex-col md:col-span-2 w-full h-full min-h-0">
-            <div className="px-4 pt-4 pb-2 border-b flex-shrink-0">
-              <h2 className="text-lg font-semibold text-gray-900 m-0">Nearby Issues</h2>
-              <p className="text-sm text-gray-600">Click on markers to view details</p>
+            <div className="px-4 pt-4 pb-2 border-b flex-shrink-0 bg-gradient-to-r from-blue-50 to-transparent">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900 m-0 flex items-center gap-2">
+                    📍 Bengaluru City Overview
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">
+                      🟢 {incidents.length} Live
+                    </span>
+                  </h2>
+                  <p className="text-xs text-gray-600 mt-1">Click on any issue marker to view details • Markers pulse to show severity</p>
+                </div>
+              </div>
             </div>
             <div className="flex-1 overflow-hidden min-h-0">
               <DynamicMap incidents={incidents} userLocation={userLocation} fillHeight />
@@ -111,6 +129,12 @@ export default function Home() {
 
           {/* Recent Incidents List */}
           <div className="bg-white rounded-lg shadow-sm border flex flex-col md:col-span-1 w-full h-full min-h-0">
+            {/* Bengaluru Pilot Banner - Above Recent Reports */}
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-1.5 flex items-center justify-center gap-2 text-xs font-medium">
+              <span>🧪 Bengaluru Pilot</span>
+              <span>•</span>
+              <span className="hidden sm:inline">Help improve Bengaluru</span>
+            </div>
             <div className="px-4 py-3 border-b flex-shrink-0">
               <h3 className="text-lg font-semibold text-gray-900 m-0">Recent Reports</h3>
             </div>

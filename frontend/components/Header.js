@@ -61,6 +61,12 @@ export default function Header() {
 
         {/* RIGHT: Buttons - Optimized for mobile */}
         <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
+          {/* Bengaluru Pilot Badge */}
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full whitespace-nowrap">
+            <span>🧪</span>
+            <span>Bengaluru Pilot</span>
+          </span>
+
           {!isGovernance && (
             <>
               {/* Governance Hub Button */}

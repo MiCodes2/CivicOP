@@ -27,39 +27,43 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
     ? 'h-full' 
     : (small ? "h-[411px] md:h-[771px]" : 'h-[643px] md:h-[1004px]');
 
-  // If a userLocation prop is passed, prefer it. Otherwise attempt to detect via browser geolocation.
+  // Detect user location (just for marker, not for centering map)
+  // Keep default Bengaluru city-wide view
   useEffect(() => {
-    if (userLocation && userLocation.latitude && userLocation.longitude) {
-      const loc = [userLocation.latitude, userLocation.longitude];
-      setCenter(loc);
-      setDetectedLocation(loc);
-      return;
-    }
-
     if (typeof navigator !== 'undefined' && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const loc = [pos.coords.latitude, pos.coords.longitude];
-          setCenter(loc);
+          // Store location for marker only - DON'T recenter map
           setDetectedLocation(loc);
         },
         (err) => {
           // permission denied or error — keep default center
           console.warn('Geolocation error:', err);
         },
-        { enableHighAccuracy: true, maximumAge: 60 * 1000 }
+        { enableHighAccuracy: false, maximumAge: 60 * 1000 }
       );
     }
-  }, [userLocation]);
+  }, []);
 
   // Small helper to programmatically recenter the map when the center state updates
   function Recenter({ position }) {
     const map = useMap();
     useEffect(() => {
-      if (position && map) {
-        map.setView(position, map.getZoom());
+      if (position && map && map._container && map._panes) {
+        try {
+          // Add a small delay to ensure map is fully initialized
+          const timer = setTimeout(() => {
+            if (map._size && map._size.x > 0 && map._size.y > 0) {
+              map.setView(position, map.getZoom(), { animate: false });
+            }
+          }, 100);
+          return () => clearTimeout(timer);
+        } catch (error) {
+          console.warn('Error recentering map:', error);
+        }
       }
-    }, [position]);
+    }, [position, map]);
     return null;
   }
 
@@ -83,6 +87,10 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
     const severityLabel = severityLabels[severity] || 'Medium'
     const emoji = severity >= 4 ? '🚨' : severity === 3 ? '⚠️' : severity === 2 ? '⚡' : '✓'
     
+    // More intense animation for high severity
+    const animationDuration = severity >= 4 ? '1.2s' : '2s'
+    const pulseOpacity = severity >= 4 ? 0.8 : 0.6
+    
     return L.divIcon({
       className: 'severity-marker-wrapper',
       html: `<div class="severity-marker-bounce" style="
@@ -101,10 +109,40 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
         color: white;
         text-shadow: 0 2px 4px rgba(0,0,0,0.4);
         position: relative;
+        animation: markerBounce ${animationDuration} ease-in-out infinite;
       " title="${severityLabel}">
         <div style="transform: rotate(45deg); display: flex; align-items: center; justify-content: center;">${emoji}</div>
       </div>
-      <div class="severity-pulse" style="position: absolute; width: 48px; height: 48px; border-radius: 50%; border: 2px solid ${color}; opacity: 0; left: 50%; top: 50%; transform: translate(-50%, -50%); animation: pulse 2s infinite;"></div>`,
+      <style>
+        @keyframes markerBounce {
+          0%, 100% { transform: rotate(-45deg) scale(1); }
+          50% { transform: rotate(-45deg) scale(1.15); }
+        }
+        @keyframes markerPulse {
+          0%, 100% { 
+            box-shadow: 0 0 0 0 ${color}66;
+            opacity: 0.6;
+          }
+          50% { 
+            box-shadow: 0 0 0 12px ${color}00;
+            opacity: ${pulseOpacity};
+          }
+        }
+      </style>
+      <div class="severity-pulse" style="
+        position: absolute; 
+        width: 50px; 
+        height: 50px; 
+        border-radius: 50%; 
+        background: ${color}22;
+        border: 3px solid ${color}88;
+        opacity: 0.8;
+        left: 50%; 
+        top: 50%; 
+        transform: translate(-50%, -50%);
+        animation: markerPulse ${animationDuration} infinite;
+        pointer-events: none;
+      "></div>`,
       iconSize: [44, 44],
       iconAnchor: [22, 44],
       popupAnchor: [0, -44],
@@ -114,12 +152,11 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
 
   return (
     <div className={`relative ${sizeClass} w-full rounded-lg shadow-sm border border-gray-200 overflow-hidden`}>
-      <MapContainer center={center} zoom={13} style={{ height: '100%', width: '100%' }}>
+      <MapContainer center={center} zoom={11} style={{ height: '100%', width: '100%' }}>
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='© OpenStreetMap contributors'
         />
-        <Recenter position={center} />
         {center && (
           <Marker
             position={center}

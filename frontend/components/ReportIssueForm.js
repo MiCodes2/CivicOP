@@ -44,7 +44,17 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
     }
   }, [])
 
-  // Geocode address to lat/lng using OpenStreetMap Nominatim with robust fallbacks
+  // Check if a location is within Bengaluru bounds
+  const isWithinBengaluru = (lat, lon) => {
+    // Bengaluru approximate bounds
+    const minLat = 12.7
+    const maxLat = 13.2
+    const minLng = 77.3
+    const maxLng = 77.9
+    return lat >= minLat && lat <= maxLat && lon >= minLng && lon <= maxLng
+  }
+
+  // Geocode address to lat/lng using OpenStreetMap Nominatim - Bengaluru only
   const handleAddressGeocode = async () => {
     if (!formData.address.trim()) {
       setError('Please enter an address')
@@ -55,55 +65,39 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
     setError(null)
     
     try {
-      // First attempt: Search with India country code
+      // Search with Bengaluru context
+      const searchQuery = `${formData.address}, Bengaluru, Karnataka, India`
       let response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(formData.address)}&countrycodes=in&limit=1`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5`,
         { signal: AbortSignal.timeout(10000) }
       )
       let data = await response.json()
       
-      // Second attempt: Without country restriction if first fails
-      if (!data || data.length === 0) {
-        response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(formData.address)}&limit=1`,
-          { signal: AbortSignal.timeout(10000) }
-        )
-        data = await response.json()
-      }
-      
       if (data && data.length > 0) {
-        // Success: Found location
-        const { lat, lon, display_name } = data[0]
-        setFormData(prev => ({
-          ...prev,
-          latitude: parseFloat(lat),
-          longitude: parseFloat(lon),
-          address: display_name
-        }))
+        // Filter results to only Bengaluru area
+        const bengaluruResults = data.filter(result => isWithinBengaluru(parseFloat(result.lat), parseFloat(result.lon)))
+        
+        if (bengaluruResults.length > 0) {
+          // Success: Found location in Bengaluru
+          const { lat, lon, display_name } = bengaluruResults[0]
+          setFormData(prev => ({
+            ...prev,
+            latitude: parseFloat(lat),
+            longitude: parseFloat(lon),
+            address: display_name
+          }))
+          setError(null)
+        } else {
+          // No results in Bengaluru
+          setError('❌ Location must be within Bengaluru city limits. Please enter a valid Bengaluru address or use the map to select your location.')
+        }
       } else {
-        // Fallback: No results found, use Delhi as default
-        const approxLat = 28.6139  // Delhi center
-        const approxLng = 77.2090
-        setFormData(prev => ({
-          ...prev,
-          latitude: approxLat,
-          longitude: approxLng,
-          address: formData.address
-        }))
-        setError('📍 Location not found. Using approximate coordinates near Delhi. Please enable GPS for accurate location.')
+        // No results found
+        setError('❌ Address not found. Please enter a valid Bengaluru address or use the map to select your location.')
       }
     } catch (err) {
       console.error('Geocoding error:', err)
-      // Network error fallback: Use Delhi coordinates
-      const approxLat = 28.6139
-      const approxLng = 77.2090
-      setFormData(prev => ({
-        ...prev,
-        latitude: approxLat,
-        longitude: approxLng,
-        address: formData.address
-      }))
-      setError('⚠️ Could not reach location service. Using approximate coordinates. Please enable GPS for better accuracy.')
+      setError('⚠️ Could not reach location service. Please use the map to select your location in Bengaluru.')
     } finally {
       setGeocodingLoading(false)
     }
@@ -131,21 +125,29 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
       setLoading(true)
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setFormData(prev => ({
-            ...prev,
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          }))
+          const lat = position.coords.latitude
+          const lon = position.coords.longitude
+          
+          if (isWithinBengaluru(lat, lon)) {
+            setFormData(prev => ({
+              ...prev,
+              latitude: lat,
+              longitude: lon,
+            }))
+            setError(null)
+          } else {
+            setError('❌ Your location is outside Bengaluru. Please move to Bengaluru or use the address search to find a valid location.')
+          }
           setLoading(false)
         },
         (error) => {
           console.error('Error getting location:', error)
-          setError('Could not get your location. Please enable location services.')
+          setError('Could not get your location. Please use the address search or map to select a location in Bengaluru.')
           setLoading(false)
         }
       )
     } else {
-      setError('Geolocation is not supported by your browser')
+      setError('Geolocation is not supported by your browser. Please use the address search or map to select your location in Bengaluru.')
     }
   }
 
@@ -165,6 +167,11 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
       if (!formData.latitude || !formData.longitude) {
         throw new Error('Please set your location')
       }
+      
+      // Validate location is in Bengaluru
+      if (!isWithinBengaluru(formData.latitude, formData.longitude)) {
+        throw new Error('\u274c Location must be within Bengaluru city limits. Please select a valid location using the map or address search.')
+      }
 
       let imageUrl = null
 
@@ -177,7 +184,7 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
         const { error: uploadError } = await supabase.storage
           .from('issues')
           .upload(filePath, imageFile, {
-            cacheControl: '3600',
+            cacheControl: '0',
             upsert: false
           })
 
@@ -242,12 +249,20 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 overflow-y-auto" style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}>
       <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full my-4 max-h-[calc(100vh-5rem)] overflow-y-auto" role="dialog" aria-modal="true">
-        {/* Header */}
-        <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">Report an Issue</h2>
+        {/* Header with Pilot Badge */}
+        <div className="sticky top-0 bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-200 px-6 py-4 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold text-gray-900">Report an Issue</h2>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-600 text-white text-xs font-bold rounded-full">
+                🧪 Bengaluru Pilot
+              </span>
+            </div>
+            <p className="text-xs text-blue-700 font-medium mt-2">📍 Bengaluru City Only - This is a pilot program currently live in Bengaluru</p>
+          </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition"
+            className="text-gray-500 hover:text-gray-700 transition flex-shrink-0"
           >
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -257,6 +272,15 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6 pb-10">
+          {/* Bengaluru Restriction Notice */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+            <span className="text-xl mt-0.5">🔵</span>
+            <div>
+              <p className="text-sm font-medium text-blue-900">Report Issues in Bengaluru Only</p>
+              <p className="text-xs text-blue-700 mt-1">Please note: This platform is currently available only for reporting civic issues within Bengaluru city limits. If your location is outside Bengaluru, please try again from within the city.</p>
+            </div>
+          </div>
+
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
               {error}
@@ -407,7 +431,7 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
                 type="text"
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Enter address (e.g., Connaught Place, New Delhi)"
+                placeholder="Enter address (e.g., MG Road, Whitefield, Indiranagar)"
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <button
