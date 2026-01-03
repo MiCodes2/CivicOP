@@ -20,6 +20,7 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
   const DEFAULT_ZOOM = 11;
   
   const [center, setCenter] = useState(BENGALURU_CENTER); // Default to Bengaluru city center
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM); // Track zoom level
   const [userLocation_detected, setUserLocation] = useState(null);
   const [locationError, setLocationError] = useState(null);
 
@@ -33,7 +34,7 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
 
   /**
    * Custom function to detect user's current location and create blue marker
-   * Map stays at Bengaluru city center view, blue dot shows user location
+   * Like Google Maps: Auto-centers map to user location and zooms in when detected
    */
   const detectUserLocation = () => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
@@ -50,6 +51,10 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
         
         console.log(`📍 User Location Detected: [${latitude.toFixed(4)}, ${longitude.toFixed(4)}], Accuracy: ${accuracy.toFixed(0)}m`);
         setUserLocation(userLoc);
+        
+        // Auto-recenter map to user location (like Google Maps)
+        setCenter(userLoc);
+        setZoom(15); // Zoom in to show user location prominently
         setLocationError(null);
       },
       (error) => {
@@ -190,7 +195,7 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
 
   return (
     <div className={`relative ${sizeClass} w-full rounded-lg shadow-sm border border-gray-200 overflow-hidden`}>
-      <MapContainer center={BENGALURU_CENTER} zoom={DEFAULT_ZOOM} style={{ height: '100%', width: '100%' }}>
+      <MapContainer center={center} zoom={zoom} style={{ height: '100%', width: '100%' }}>
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='© OpenStreetMap contributors'
@@ -201,10 +206,19 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
           <Marker
             position={userLocation_detected}
             icon={L.divIcon({
-              className: 'user-current-location',
-              html: `<div class="user-location-blue-dot"></div>`,
+              className: 'leaflet-zoom-animated leaflet-user-location-marker',
+              html: `
+                <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 0 6px rgba(30, 64, 175, 0.6)); animation: userLocationPulse 2.5s infinite;">
+                  <circle cx="16" cy="16" r="12" fill="#1E40AF" opacity="0.2" />
+                  <circle cx="16" cy="16" r="10" fill="none" stroke="#1E40AF" stroke-width="1" opacity="0.4" />
+                  <circle cx="16" cy="16" r="8" fill="#3B82F6" />
+                  <circle cx="16" cy="16" r="8" fill="none" stroke="#ffffff" stroke-width="3" />
+                  <circle cx="16" cy="16" r="4" fill="#ffffff" />
+                </svg>
+              `,
               iconSize: [32, 32],
               iconAnchor: [16, 16],
+              popupAnchor: [0, -16],
             })}
             zIndexOffset={1000}
           >
@@ -320,14 +334,11 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
         }
         
         @keyframes userLocationPulse {
-          0% {
-            box-shadow: 0 0 0 0 rgba(59, 153, 217, 0.7);
+          0%, 100% {
+            filter: drop-shadow(0 0 6px rgba(30, 64, 175, 0.6));
           }
-          70% {
-            box-shadow: 0 0 0 12px rgba(59, 153, 217, 0);
-          }
-          100% {
-            box-shadow: 0 0 0 0 rgba(59, 153, 217, 0);
+          50% {
+            filter: drop-shadow(0 0 12px rgba(30, 64, 175, 0.9)) drop-shadow(0 0 20px rgba(59, 130, 246, 0.5));
           }
         }
         
@@ -374,33 +385,9 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false }) => 
           filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
         }
 
-        /* User's current location - Blue pulsing dot like Google Maps */
-        .user-current-location {
+        /* User location marker - SVG based */
+        .leaflet-user-location-marker {
           z-index: 1000 !important;
-        }
-        
-        .user-location-blue-dot {
-          position: relative;
-          width: 28px;
-          height: 28px;
-          background: linear-gradient(135deg, #1E40AF, #3B82F6);
-          border-radius: 50%;
-          border: 5px solid #ffffff;
-          box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.3), 0 4px 12px rgba(30, 64, 175, 0.6);
-          animation: userLocationPulse 2.5s infinite;
-        }
-        
-        .user-location-blue-dot::before {
-          content: '';
-          position: absolute;
-          left: 50%;
-          top: 50%;
-          transform: translate(-50%, -50%);
-          width: 10px;
-          height: 10px;
-          background: #ffffff;
-          border-radius: 50%;
-          box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
         }
         
         .user-location-popup {
