@@ -117,23 +117,19 @@ export const dbHelpers = {
   },
 
   async updateIncident(id: string, updates: any) {
-    try {
-      const { data, error } = await supabase
-        .from('civic_issues')
-        .update(updates)
-        .eq('id', id)
-        .select()
-      if (!error) return data
-    } catch (e) {
-      console.debug('updateIncident: civic_issues update failed, trying incidents', e)
-    }
-
+    // Try civic_issues table first
     const { data, error } = await supabase
-      .from('incidents')
+      .from('civic_issues')
       .update(updates)
       .eq('id', id)
       .select()
-    if (error) throw error
+    
+    if (error) {
+      console.error('updateIncident failed:', error)
+      throw error
+    }
+    
+    console.log('updateIncident success:', data)
     return data
   },
 

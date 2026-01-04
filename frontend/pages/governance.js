@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -38,6 +38,58 @@ export default function GovernanceDashboard() {
     severity: 1
   });
 
+  // Shared incidents state - lifted up for all views to use
+  const [sharedIncidents, setSharedIncidents] = useState([]);
+  const [incidentsLoading, setIncidentsLoading] = useState(true);
+
+  // Fetch incidents function - shared across all views
+  const fetchSharedIncidents = async () => {
+    try {
+      setIncidentsLoading(true);
+      const { data, error } = await supabase
+        .from('civic_issues')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      
+      if (error) throw error;
+      
+      const incidents = (Array.isArray(data) ? data : []).map(d => ({
+        ...d,
+        latitude: d.latitude != null ? parseFloat(d.latitude) : null,
+        longitude: d.longitude != null ? parseFloat(d.longitude) : null,
+      }));
+      
+      setSharedIncidents(incidents);
+      console.log('Shared incidents loaded:', incidents.length);
+    } catch (err) {
+      console.error('Error fetching shared incidents:', err);
+    } finally {
+      setIncidentsLoading(false);
+    }
+  };
+
+  // Subscribe to real-time changes
+  useEffect(() => {
+    if (!authChecked) return;
+
+    // Initial fetch
+    fetchSharedIncidents();
+
+    // Set up real-time subscription
+    const subscription = supabase
+      .channel('civic_issues_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'civic_issues' }, (payload) => {
+        console.log('Real-time update:', payload);
+        // Refresh data on any change
+        fetchSharedIncidents();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [authChecked]);
   // Check authentication on mount
   useEffect(() => {
     let isMounted = true
@@ -180,9 +232,9 @@ export default function GovernanceDashboard() {
       <main className="flex-1 w-full bg-gray-50 overflow-hidden relative p-2">
           {/* Internal Container maintains 100% height */}
           <div className="h-full w-full flex flex-col">
-            {activeNav === 'dashboard' && <DashboardView />}
-            {activeNav === 'map' && <MapView />}
-            {(activeNav === 'tickets' || activeNav === 'ai') && <KanbanView filters={filters} setFilters={setFilters} />}
+            {activeNav === 'dashboard' && <DashboardView incidents={sharedIncidents} loading={incidentsLoading} />}
+            {activeNav === 'map' && <MapView incidents={sharedIncidents} />}
+            {(activeNav === 'tickets' || activeNav === 'ai') && <KanbanView incidents={sharedIncidents} setIncidents={setSharedIncidents} filters={filters} setFilters={setFilters} refreshIncidents={fetchSharedIncidents} loading={incidentsLoading} />}
             {activeNav === 'iot' && <IoTView />}
           </div>
       </main>
@@ -237,49 +289,40 @@ function NavTab({ label, active, onClick, icon }) {
 // ----------------------------------------------------------------------
 // 4. DASHBOARD VIEW (Full Width Map + Fixed Sidebar)
 // ----------------------------------------------------------------------
-function DashboardView() {
+function DashboardView({ incidents = [], loading = false }) {
   const [layerToggles, setLayerToggles] = useState({ traffic: true, infra: true, predictiveFlood: false });
-  const [incidents, setIncidents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [allIncidents, setAllIncidents] = useState([]);
 
-  useEffect(() => {
-    fetchIncidents();
-  }, []);
-
-  const fetchIncidents = async () => {
-    try {
-      let { data, error } = await supabase
-        .from('civic_issues')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-      
-      if (error) throw error;
-
-      if (!(Array.isArray(data) && data.length > 0)) {
-        const res2 = await supabase
-          .from('incidents')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(50);
-        data = (res2 && res2.data) || data;
-      }
-
-      const allData = (Array.isArray(data) ? data : []).map(d => ({
-        ...d,
-        latitude: d.latitude != null ? parseFloat(d.latitude) : null,
-        longitude: d.longitude != null ? parseFloat(d.longitude) : null,
-      }));
-      console.debug('DashboardView fetched incidents:', allData.length);
-      setAllIncidents(allData);
-      setIncidents(allData);
-    } catch (err) {
-      console.error('Error fetching incidents:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Derive comprehensive stats from shared incidents
+  const openCount = incidents.filter(i => i.status === 'OPEN' || !i.status).length;
+  const inProgressCount = incidents.filter(i => i.status === 'IN_PROGRESS').length;
+  const resolvedCount = incidents.filter(i => i.status === 'RESOLVED' || i.status === 'CLOSED').length;
+  
+  // Additional admin-only insights
+  const criticalCount = incidents.filter(i => i.severity >= 4).length;
+  const highPriorityCount = incidents.filter(i => i.severity >= 3).length;
+  const todayCount = incidents.filter(i => {
+    const created = new Date(i.created_at);
+    const today = new Date();
+    return created.toDateString() === today.toDateString();
+  }).length;
+  
+  // Category breakdown
+  const categoryBreakdown = incidents.reduce((acc, i) => {
+    const cat = i.category || 'Other';
+    acc[cat] = (acc[cat] || 0) + 1;
+    return acc;
+  }, {});
+  const topCategories = Object.entries(categoryBreakdown)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+  
+  // Resolution rate
+  const resolutionRate = incidents.length > 0 
+    ? Math.round((resolvedCount / incidents.length) * 100) 
+    : 0;
+  
+  // Average response time (mock calculation based on status)
+  const avgResponseTime = inProgressCount > 0 ? '2.4h' : 'N/A';
 
   // Get critical incidents
   const criticalIncidents = incidents.filter(i => i.severity >= 4).slice(0, 3);
@@ -317,63 +360,137 @@ function DashboardView() {
 
         {/* Map Canvas */}
         <div className="flex-1 relative bg-gray-100 min-h-0">
-          <DynamicMap incidents={allIncidents} userLocation={null} fillHeight />
+          <DynamicMap incidents={incidents} userLocation={null} fillHeight />
           
-          {/* Floating Overlays */}
-          <div className="absolute top-4 left-4 bg-white/95 backdrop-blur rounded-lg shadow-lg border border-gray-100 p-3 min-w-[140px]">
-             <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Active Cluster</div>
+          {/* Floating Overlays - Admin-only detailed info */}
+          <div className="absolute top-4 left-4 bg-white/95 backdrop-blur rounded-lg shadow-lg border border-gray-100 p-3 min-w-[160px]">
+             <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">🎯 Hotspot Cluster</div>
              <div className="text-lg font-bold text-gray-800">Ward 15</div>
+             <div className="text-[10px] text-gray-500 mt-1">{criticalCount} critical issues</div>
+          </div>
+          
+          <div className="absolute top-4 right-4 bg-white/95 backdrop-blur rounded-lg shadow-lg border border-gray-100 p-3 min-w-[140px]">
+             <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">📊 Resolution Rate</div>
+             <div className="text-lg font-bold text-green-600">{resolutionRate}%</div>
+             <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+               <div className="bg-green-500 h-1.5 rounded-full transition-all duration-500" style={{width: `${resolutionRate}%`}}></div>
+             </div>
           </div>
           
           <div className="absolute bottom-4 left-4 bg-green-50/95 backdrop-blur rounded-lg shadow-sm border border-green-200 p-2 px-3 flex items-center space-x-2">
              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
              <div className="text-xs font-bold text-green-800">SENSOR: AQI NORMAL (45)</div>
           </div>
+          
+          <div className="absolute bottom-4 right-4 bg-blue-50/95 backdrop-blur rounded-lg shadow-sm border border-blue-200 p-2 px-3 flex items-center space-x-2">
+             <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+             <div className="text-xs font-bold text-blue-800">AVG RESPONSE: {avgResponseTime}</div>
+          </div>
         </div>
       </div>
 
-      {/* LIVE FEED (Fixed Width 360px) */}
-      <div className="w-[360px] flex flex-col bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden shrink-0">
-        <div className="px-4 py-2.5 border-b border-gray-200 shrink-0 bg-gray-50/50 flex justify-between items-center">
-          <h2 className="font-semibold text-gray-800 text-sm">Live Ingestion ({incidents.length})</h2>
-          <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold animate-pulse">LIVE</span>
+      {/* ADMIN INSIGHTS PANEL (Fixed Width 380px) */}
+      <div className="w-[380px] flex flex-col gap-3 shrink-0 overflow-y-auto">
+        {/* Quick Stats Grid */}
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3">
+          <h3 className="font-semibold text-gray-800 text-sm mb-3 flex items-center gap-2">
+            📈 Quick Stats
+            <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold animate-pulse">LIVE</span>
+          </h3>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-orange-50 rounded-lg p-3 text-center border border-orange-100">
+              <div className="text-2xl font-bold text-orange-600">{openCount}</div>
+              <div className="text-[10px] text-orange-700 font-semibold uppercase">Open</div>
+            </div>
+            <div className="bg-blue-50 rounded-lg p-3 text-center border border-blue-100">
+              <div className="text-2xl font-bold text-blue-600">{inProgressCount}</div>
+              <div className="text-[10px] text-blue-700 font-semibold uppercase">In Progress</div>
+            </div>
+            <div className="bg-green-50 rounded-lg p-3 text-center border border-green-100">
+              <div className="text-2xl font-bold text-green-600">{resolvedCount}</div>
+              <div className="text-[10px] text-green-700 font-semibold uppercase">Resolved</div>
+            </div>
+            <div className="bg-red-50 rounded-lg p-3 text-center border border-red-100">
+              <div className="text-2xl font-bold text-red-600">{criticalCount}</div>
+              <div className="text-[10px] text-red-700 font-semibold uppercase">Critical</div>
+            </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
+            <span className="text-gray-500">Today's Reports:</span>
+            <span className="font-bold text-gray-800">{todayCount}</span>
+          </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-0 scrollbar-thin scrollbar-thumb-gray-200">
-           {loading ? (
-             <div className="p-4 text-center text-gray-500 text-sm">Loading incidents...</div>
-           ) : latestIncidents.length === 0 ? (
-             <div className="p-4 text-center text-gray-500 text-sm">No incidents found</div>
-           ) : (
-             latestIncidents.map((incident, idx) => {
-               const severity = incident.severity || 3;
-               const getColors = () => {
-                 if (severity >= 4) return { border: 'border-l-red-500', bg: 'bg-red-50/10', color: 'text-red-700' };
-                 if (severity === 3) return { border: 'border-l-yellow-500', bg: 'bg-yellow-50/10', color: 'text-yellow-700' };
-                 return { border: 'border-l-blue-500', bg: 'bg-blue-50/10', color: 'text-blue-700' };
-               };
-               const colors = getColors();
-               const timeAgo = Math.floor((new Date() - new Date(incident.created_at)) / 60000);
-               const timeStr = timeAgo < 60 ? `${timeAgo}m ago` : `${Math.floor(timeAgo / 60)}h ago`;
-               
-               return (
-                 <div key={incident.id} className={`p-3 border-b border-gray-100 hover:bg-blue-50/30 transition-colors border-l-4 ${colors.border} ${colors.bg} cursor-pointer group`}>
-                    <div className="flex justify-between items-start">
-                        <div className={`font-bold text-sm ${colors.color} group-hover:underline`}>
-                          {severity >= 4 ? '🔴' : severity === 3 ? '🟡' : '🔵'} #{incident.id.toString().slice(-4)} {incident.category || 'Issue'}
-                        </div>
-                        <div className="text-[10px] text-gray-400 font-mono">{timeStr}</div>
-                    </div>
-                    <div className="text-xs text-gray-600 mt-1">📍 {incident.address || `${incident.latitude?.toFixed(4)}, ${incident.longitude?.toFixed(4)}`}</div>
-                    <div className="mt-2 flex justify-between items-center">
-                        <span className={`text-[10px] ${incident.status === 'OPEN' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'} px-1.5 py-0.5 rounded font-bold`}>
-                          {incident.status || 'OPEN'}
-                        </span>
-                        {incident.severity && <span className="text-[10px] text-gray-600">Severity: {incident.severity}/5</span>}
-                    </div>
-                 </div>
-               );
-             })
-           )}
+        
+        {/* Category Breakdown - Admin Only */}
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3">
+          <h3 className="font-semibold text-gray-800 text-sm mb-3">🏷️ Category Breakdown</h3>
+          <div className="space-y-2">
+            {topCategories.map(([cat, count]) => (
+              <div key={cat} className="flex items-center justify-between">
+                <span className="text-xs text-gray-600 capitalize">{cat}</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-20 bg-gray-100 rounded-full h-1.5">
+                    <div 
+                      className="bg-blue-500 h-1.5 rounded-full" 
+                      style={{width: `${Math.min((count / incidents.length) * 100, 100)}%`}}
+                    ></div>
+                  </div>
+                  <span className="text-xs font-bold text-gray-700 w-6 text-right">{count}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Live Feed */}
+        <div className="flex-1 bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-[200px]">
+          <div className="px-3 py-2 border-b border-gray-200 shrink-0 bg-gray-50/50 flex justify-between items-center">
+            <h3 className="font-semibold text-gray-800 text-sm">🔴 Live Feed</h3>
+            <span className="text-[10px] text-gray-500">{latestIncidents.length} recent</span>
+          </div>
+          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
+             {loading ? (
+               <div className="p-4 text-center text-gray-500 text-sm">Loading...</div>
+             ) : latestIncidents.length === 0 ? (
+               <div className="p-4 text-center text-gray-500 text-sm">No incidents</div>
+             ) : (
+               latestIncidents.map((incident) => {
+                 const severity = incident.severity || 3;
+                 const getColors = () => {
+                   if (incident.status === 'RESOLVED') return { border: 'border-l-green-500', bg: 'bg-green-50/20', color: 'text-green-700' };
+                   if (severity >= 4) return { border: 'border-l-red-500', bg: 'bg-red-50/10', color: 'text-red-700' };
+                   if (severity === 3) return { border: 'border-l-yellow-500', bg: 'bg-yellow-50/10', color: 'text-yellow-700' };
+                   return { border: 'border-l-blue-500', bg: 'bg-blue-50/10', color: 'text-blue-700' };
+                 };
+                 const colors = getColors();
+                 const timeAgo = Math.floor((new Date() - new Date(incident.created_at)) / 60000);
+                 const timeStr = timeAgo < 60 ? `${timeAgo}m ago` : `${Math.floor(timeAgo / 60)}h ago`;
+                 
+                 return (
+                   <div key={incident.id} className={`p-2.5 border-b border-gray-100 hover:bg-blue-50/30 transition-colors border-l-4 ${colors.border} ${colors.bg} cursor-pointer`}>
+                      <div className="flex justify-between items-start">
+                          <div className={`font-bold text-xs ${colors.color}`}>
+                            {incident.status === 'RESOLVED' ? '✅' : severity >= 4 ? '🔴' : severity === 3 ? '🟡' : '🔵'} #{incident.id.toString().slice(-4)} {incident.category || 'Issue'}
+                          </div>
+                          <div className="text-[10px] text-gray-400 font-mono">{timeStr}</div>
+                      </div>
+                      <div className="text-[10px] text-gray-500 mt-0.5 truncate">📍 {incident.address || `${incident.latitude?.toFixed(4)}, ${incident.longitude?.toFixed(4)}`}</div>
+                      <div className="mt-1.5 flex items-center gap-2">
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                            incident.status === 'RESOLVED' ? 'bg-green-100 text-green-700' :
+                            incident.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-700' :
+                            'bg-orange-100 text-orange-700'
+                          }`}>
+                            {incident.status || 'OPEN'}
+                          </span>
+                          <span className="text-[9px] text-gray-500">Sev: {severity}/5</span>
+                          {incident.assigned_to && <span className="text-[9px] text-purple-600">👤 Assigned</span>}
+                      </div>
+                   </div>
+                 );
+               })
+             )}
+          </div>
         </div>
       </div>
     </div>
@@ -383,66 +500,43 @@ function DashboardView() {
 // ----------------------------------------------------------------------
 // 5. KANBAN VIEW (Full Height Columns)
 // ----------------------------------------------------------------------
-function KanbanView({ filters, setFilters }) {
-  const [incidents, setIncidents] = useState([]);
-  const [loading, setLoading] = useState(true);
+function KanbanView({ incidents, setIncidents, filters, setFilters, refreshIncidents, loading }) {
   const [message, setMessage] = useState(null);
+  const [draggedItem, setDraggedItem] = useState(null);
 
-  useEffect(() => {
-    fetchIncidents();
-  }, [filters.category, filters.severity]);
-
-  const fetchIncidents = async () => {
-    try {
-      setLoading(true);
-      // Primary table: civic_issues. Fallback to 'incidents' if empty.
-      let query = supabase
-        .from('civic_issues')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      // If civic_issues returns no rows, attempt to check for legacy 'incidents' table
-      const { data: sample, error: sampleErr } = await query.limit(1);
-      if (sampleErr) {
-        console.warn('civic_issues sample query failed:', sampleErr.message || sampleErr);
-      }
-
-      if (!Array.isArray(sample) || sample.length === 0) {
-        // If civic_issues is empty, no fallback - use civic_issues only
-        // Legacy 'incidents' table is deprecated
-      }
-
-      if (filters.category && filters.category !== 'All Categories') {
-        query = query.eq('category', filters.category);
-      }
-
-      if (filters.severity && filters.severity > 0) {
-        query = query.gte('severity', filters.severity);
-      }
-
-      const { data, error } = await query.limit(200);
-      if (error) throw error;
-      setIncidents(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Error fetching incidents:', err);
-    } finally {
-      setLoading(false);
+  // Filter incidents based on current filters
+  const filteredIncidents = useMemo(() => {
+    let result = [...incidents];
+    
+    if (filters.category && filters.category !== 'All Categories') {
+      result = result.filter(i => i.category === filters.category);
     }
-  };
+    
+    if (filters.severity && filters.severity > 0) {
+      result = result.filter(i => (i.severity || 0) >= filters.severity);
+    }
+    
+    return result;
+  }, [incidents, filters.category, filters.severity]);
 
   const updateIncidentStatus = async (id, newStatus) => {
     // Optimistic UI update
-    const prevIncidents = incidents;
+    const prevIncidents = [...incidents];
     setIncidents(prev => prev.map(i => i.id === id ? { ...i, status: newStatus } : i));
 
     try {
-      // Check user is authenticated
-      if (!currentUser) {
+      // Check user is authenticated via Supabase session
+      const user = await authHelpers.getUser();
+      if (!user) {
         throw new Error('Not authenticated. Please sign in first.');
       }
 
-      // Use dbHelpers.updateIncident which tries both tables and throws if both fail
+      console.log('Updating incident status:', { id, newStatus, userId: user.id });
+
+      // Use dbHelpers.updateIncident which tries civic_issues table
       const updated = await dbHelpers.updateIncident(String(id), { status: newStatus });
+
+      console.log('Update response:', updated);
 
       // Validate the response - Supabase returns an array of updated rows
       if (!updated || (Array.isArray(updated) && updated.length === 0)) {
@@ -453,8 +547,10 @@ function KanbanView({ filters, setFilters }) {
       setMessage(`✓ Moved to ${newStatus}`);
       setTimeout(() => setMessage(null), 2000);
       
-      // Refresh data in background without blocking
-      fetchIncidents().catch(err => console.error('Refresh after update failed:', err));
+      // Refresh data in background - this updates all views via shared state
+      if (refreshIncidents) {
+        refreshIncidents().catch(err => console.error('Refresh after update failed:', err));
+      }
       
       return true;
     } catch (err) {
@@ -468,10 +564,10 @@ function KanbanView({ filters, setFilters }) {
     }
   };
 
-  // Group incidents by status
-  const openIncidents = incidents.filter(i => i.status === 'OPEN' || !i.status);
-  const inProgressIncidents = incidents.filter(i => i.status === 'IN_PROGRESS');
-  const resolvedIncidents = incidents.filter(i => i.status === 'RESOLVED' || i.status === 'CLOSED');
+  // Group filtered incidents by status (counts update automatically when incidents change)
+  const openIncidents = filteredIncidents.filter(i => i.status === 'OPEN' || !i.status);
+  const inProgressIncidents = filteredIncidents.filter(i => i.status === 'IN_PROGRESS');
+  const resolvedIncidents = filteredIncidents.filter(i => i.status === 'RESOLVED' || i.status === 'CLOSED');
 
   return (
     <div className="h-full flex flex-col space-y-3">
@@ -520,10 +616,21 @@ function KanbanView({ filters, setFilters }) {
               <h3 className="font-bold text-gray-800 text-sm">📋 OPEN REPORTS</h3>
               <span className="bg-white text-red-600 text-xs px-2 py-0.5 rounded border border-red-100 font-bold">{openIncidents.length}</span>
            </div>
-           <div className="p-2 space-y-2 overflow-y-auto flex-1 bg-gray-50/50" onDragOver={(e) => e.preventDefault()} onDrop={async (e) => {
+           <div 
+             className="p-2 space-y-2 overflow-y-auto flex-1 bg-gray-50/50 transition-colors" 
+             onDragOver={(e) => { 
+               e.preventDefault(); 
+               e.currentTarget.classList.add('bg-red-100/50');
+             }}
+             onDragLeave={(e) => {
+               e.currentTarget.classList.remove('bg-red-100/50');
+             }}
+             onDrop={async (e) => {
                 e.preventDefault();
+                e.currentTarget.classList.remove('bg-red-100/50');
                 try {
                   const payload = JSON.parse(e.dataTransfer.getData('text/plain'));
+                  console.log('Dropped on OPEN:', payload);
                   if (payload && payload.id) {
                     const ok = await updateIncidentStatus(payload.id, 'OPEN')
                     if (!ok) {
@@ -562,11 +669,21 @@ function KanbanView({ filters, setFilters }) {
               <h3 className="font-bold text-gray-800 text-sm">⚙️ IN PROGRESS</h3>
               <span className="bg-white text-yellow-600 text-xs px-2 py-0.5 rounded border border-yellow-100 font-bold">{inProgressIncidents.length}</span>
            </div>
-           <div className="p-2 space-y-2 overflow-y-auto flex-1 bg-gray-50/50" onDragOver={(e) => e.preventDefault()} onDrop={async (e) => {
+           <div 
+             className="p-2 space-y-2 overflow-y-auto flex-1 bg-gray-50/50 transition-colors" 
+             onDragOver={(e) => { 
+               e.preventDefault(); 
+               e.currentTarget.classList.add('bg-yellow-100/50');
+             }}
+             onDragLeave={(e) => {
+               e.currentTarget.classList.remove('bg-yellow-100/50');
+             }}
+             onDrop={async (e) => {
                 e.preventDefault();
+                e.currentTarget.classList.remove('bg-yellow-100/50');
                 try {
                   const payload = JSON.parse(e.dataTransfer.getData('text/plain'));
-                  console.debug('Dropped payload on IN_PROGRESS:', payload);
+                  console.log('Dropped on IN_PROGRESS:', payload);
                   if (payload && payload.id) {
                     const ok = await updateIncidentStatus(payload.id, 'IN_PROGRESS')
                     if (!ok) {
@@ -575,7 +692,6 @@ function KanbanView({ filters, setFilters }) {
                       setTimeout(() => setMessage && setMessage(null), 3500)
                     }
                   }
-                  e.dataTransfer.clearData();
                 } catch (err) { console.error('drop error', err); }
               }}>
               {message && <div className="p-2 mb-2 rounded bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs">{message}</div>}
@@ -608,11 +724,21 @@ function KanbanView({ filters, setFilters }) {
               <h3 className="font-bold text-gray-800 text-sm">✅ RESOLVED</h3>
               <span className="bg-white text-green-600 text-xs px-2 py-0.5 rounded border border-green-100 font-bold">{resolvedIncidents.length}</span>
            </div>
-           <div className="p-2 space-y-2 overflow-y-auto flex-1 bg-gray-50/50" onDragOver={(e) => e.preventDefault()} onDrop={async (e) => {
+           <div 
+             className="p-2 space-y-2 overflow-y-auto flex-1 bg-gray-50/50 transition-colors" 
+             onDragOver={(e) => { 
+               e.preventDefault(); 
+               e.currentTarget.classList.add('bg-green-100/50');
+             }}
+             onDragLeave={(e) => {
+               e.currentTarget.classList.remove('bg-green-100/50');
+             }}
+             onDrop={async (e) => {
                 e.preventDefault();
+                e.currentTarget.classList.remove('bg-green-100/50');
                 try {
                   const payload = JSON.parse(e.dataTransfer.getData('text/plain'));
-                  console.debug('Dropped payload on RESOLVED:', payload);
+                  console.log('Dropped on RESOLVED:', payload);
                   if (payload && payload.id) {
                     const ok = await updateIncidentStatus(payload.id, 'RESOLVED')
                     if (!ok) {
@@ -621,7 +747,6 @@ function KanbanView({ filters, setFilters }) {
                       setTimeout(() => setMessage && setMessage(null), 3500)
                     }
                   }
-                  e.dataTransfer.clearData();
                 } catch (err) { console.error('drop error', err); }
               }}>
               {loading ? (
@@ -728,7 +853,18 @@ function KanbanCard({ id, title, severity, location, createdAt, status, incident
   const possibleTransitions = getStatusTransitions(status);
 
   return (
-    <div draggable={true} onDragStart={(e) => { e.dataTransfer.setData('text/plain', JSON.stringify({ id: incidentId, from: status })); }} className={`bg-white border border-gray-200 rounded p-3 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing border-l-4 ${colors.border} ${colors.bg}`}>
+    <div 
+      draggable={true} 
+      onDragStart={(e) => { 
+        e.dataTransfer.setData('text/plain', JSON.stringify({ id: incidentId, from: status }));
+        e.dataTransfer.effectAllowed = 'move';
+        e.target.style.opacity = '0.5';
+      }}
+      onDragEnd={(e) => {
+        e.target.style.opacity = '1';
+      }}
+      className={`bg-white border border-gray-200 rounded p-3 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing border-l-4 ${colors.border} ${colors.bg}`}
+    >
       <div className="flex justify-between items-start">
          <span className="font-bold text-sm text-gray-800 hover:text-blue-600 transition-colors flex items-center gap-1">
            <span>{colors.emoji}</span>
@@ -848,51 +984,226 @@ function IoTView() {
   );
 }
 
-// 8. MAP VIEW
+// 8. MAP VIEW - Enhanced Admin Map with More Data
 // -----------------------------------------------------------------------
-function MapView() {
-  const [incidents, setIncidents] = useState([]);
-  const [loading, setLoading] = useState(true);
+function MapView({ incidents = [] }) {
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [severityFilter, setSeverityFilter] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [showHeatmap, setShowHeatmap] = useState(false);
+  const [showClusters, setShowClusters] = useState(true);
+  const [selectedIncident, setSelectedIncident] = useState(null);
 
-  useEffect(() => {
-    fetchIncidents();
-  }, []);
-
-  const fetchIncidents = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('civic_issues')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
-      
-      if (error) throw error;
-
-      const normalized = (Array.isArray(data) ? data : []).map(d => ({
-        ...d,
-        latitude: d.latitude != null ? parseFloat(d.latitude) : null,
-        longitude: d.longitude != null ? parseFloat(d.longitude) : null,
-      }));
-      setIncidents(normalized);
-    } catch (err) {
-      console.error('Error fetching incidents:', err);
-    } finally {
-      setLoading(false);
+  // Filter incidents based on admin selections
+  const filteredIncidents = useMemo(() => {
+    let result = [...incidents];
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'open') result = result.filter(i => (i.status || 'OPEN').toUpperCase() === 'OPEN');
+      else if (statusFilter === 'in_progress') result = result.filter(i => (i.status || '').toUpperCase() === 'IN_PROGRESS');
+      else if (statusFilter === 'resolved') result = result.filter(i => ['RESOLVED', 'CLOSED'].includes((i.status || '').toUpperCase()));
     }
-  };
+    if (severityFilter > 0) {
+      result = result.filter(i => (i.severity || 1) >= severityFilter);
+    }
+    if (selectedCategory !== 'all') {
+      result = result.filter(i => (i.category || 'Other') === selectedCategory);
+    }
+    return result;
+  }, [incidents, statusFilter, severityFilter, selectedCategory]);
 
+  // Calculate admin-only stats
+  const openCount = incidents.filter(i => i.status === 'OPEN' || !i.status).length;
+  const inProgressCount = incidents.filter(i => i.status === 'IN_PROGRESS').length;
+  const resolvedCount = incidents.filter(i => i.status === 'RESOLVED' || i.status === 'CLOSED').length;
+  const criticalCount = incidents.filter(i => i.severity >= 4).length;
+  const resolutionRate = incidents.length > 0 ? Math.round((resolvedCount / incidents.length) * 100) : 0;
+  
+  // Category breakdown
+  const categoryBreakdown = incidents.reduce((acc, i) => {
+    const cat = i.category || 'Other';
+    acc[cat] = (acc[cat] || 0) + 1;
+    return acc;
+  }, {});
+  const categories = Object.keys(categoryBreakdown);
+  const topCategories = Object.entries(categoryBreakdown)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+  // Ward breakdown for admin
+  const wardBreakdown = incidents.reduce((acc, i) => {
+    const ward = i.ward_number || 'Unknown';
+    acc[ward] = (acc[ward] || 0) + 1;
+    return acc;
+  }, {});
+  const topWards = Object.entries(wardBreakdown)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+  
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden h-full flex flex-col">
-       <div className="p-3 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-          <h2 className="font-semibold text-gray-800 text-sm">Geospatial Intelligence Map</h2>
-          <button className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 shadow-sm">Export GIS</button>
+       {/* Admin Control Bar */}
+       <div className="p-3 border-b border-gray-200 bg-gradient-to-r from-slate-800 to-slate-700">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <h2 className="font-bold text-white text-sm flex items-center gap-2">
+                🗺️ Command Center Map
+              </h2>
+              <span className="text-[10px] bg-purple-500 text-white px-2 py-0.5 rounded font-bold">ADMIN ONLY</span>
+              <span className="text-[10px] bg-green-500 text-white px-2 py-0.5 rounded font-bold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+                LIVE
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-gray-300">Showing {filteredIncidents.length} of {incidents.length}</span>
+              <button className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 shadow-sm font-medium">📥 Export GIS</button>
+              <button className="text-xs bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 shadow-sm font-medium">📊 Report</button>
+            </div>
+          </div>
+          
+          {/* Filter Controls */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Status Filter */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-gray-400 font-medium">STATUS:</span>
+              <div className="flex gap-1">
+                {[{key: 'all', label: 'All', color: 'bg-gray-600'}, {key: 'open', label: 'Open', color: 'bg-orange-500'}, {key: 'in_progress', label: 'WIP', color: 'bg-blue-500'}, {key: 'resolved', label: 'Done', color: 'bg-green-500'}].map(s => (
+                  <button key={s.key} onClick={() => setStatusFilter(s.key)} className={`text-[10px] px-2 py-1 rounded font-medium transition ${statusFilter === s.key ? `${s.color} text-white` : 'bg-slate-600 text-gray-300 hover:bg-slate-500'}`}>{s.label}</button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Severity Filter */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-gray-400 font-medium">MIN SEV:</span>
+              <select value={severityFilter} onChange={(e) => setSeverityFilter(parseInt(e.target.value))} className="text-[10px] bg-slate-600 text-white border-0 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500">
+                <option value="0">Any</option>
+                <option value="3">≥3 (Medium+)</option>
+                <option value="4">≥4 (High+)</option>
+                <option value="5">5 (Critical)</option>
+              </select>
+            </div>
+            
+            {/* Category Filter */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-gray-400 font-medium">CATEGORY:</span>
+              <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="text-[10px] bg-slate-600 text-white border-0 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500">
+                <option value="all">All Categories</option>
+                {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+              </select>
+            </div>
+            
+            {/* View Toggles */}
+            <div className="flex items-center gap-1.5 ml-auto">
+              <span className="text-[10px] text-gray-400 font-medium">VIEW:</span>
+              <button onClick={() => setShowHeatmap(!showHeatmap)} className={`text-[10px] px-2 py-1 rounded font-medium transition ${showHeatmap ? 'bg-red-500 text-white' : 'bg-slate-600 text-gray-300 hover:bg-slate-500'}`}>🔥 Heatmap</button>
+              <button onClick={() => setShowClusters(!showClusters)} className={`text-[10px] px-2 py-1 rounded font-medium transition ${showClusters ? 'bg-blue-500 text-white' : 'bg-slate-600 text-gray-300 hover:bg-slate-500'}`}>🔘 Clusters</button>
+            </div>
+          </div>
        </div>
-       <div className="flex-1 bg-gray-50 relative min-h-0">
-          {loading ? (
-            <div className="flex items-center justify-center h-full text-gray-500 text-sm">Loading map...</div>
+       
+       <div className="flex-1 bg-gray-100 relative min-h-0">
+          {incidents.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-gray-500 text-sm">Loading map data...</div>
           ) : (
-            <DynamicMap incidents={incidents} userLocation={null} fillHeight zoom={14} />
+            <DynamicMap incidents={filteredIncidents} userLocation={null} fillHeight />
           )}
+          
+          {/* Admin Stats Panel - Left */}
+          <div className="absolute top-4 left-4 bg-slate-800/95 backdrop-blur rounded-lg shadow-lg border border-slate-700 p-3 min-w-[200px] z-40">
+            <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 flex items-center justify-between">
+              <span>📊 Live Statistics</span>
+              <span className="text-green-400">● Online</span>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 bg-orange-500 rounded"></span>
+                  <span className="text-xs text-gray-300">Open</span>
+                </div>
+                <span className="text-sm font-bold text-orange-400">{openCount}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 bg-blue-500 rounded"></span>
+                  <span className="text-xs text-gray-300">In Progress</span>
+                </div>
+                <span className="text-sm font-bold text-blue-400">{inProgressCount}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 bg-green-500 rounded"></span>
+                  <span className="text-xs text-gray-300">Resolved</span>
+                </div>
+                <span className="text-sm font-bold text-green-400">{resolvedCount}</span>
+              </div>
+              <div className="pt-2 border-t border-slate-700">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-gray-400">Resolution Rate</span>
+                  <span className="text-xs font-bold text-green-400">{resolutionRate}%</span>
+                </div>
+                <div className="w-full bg-slate-700 rounded-full h-1.5 mt-1">
+                  <div className="bg-gradient-to-r from-green-500 to-green-400 h-1.5 rounded-full" style={{width: `${resolutionRate}%`}}></div>
+                </div>
+              </div>
+              <div className="pt-2 border-t border-slate-700 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 bg-red-500 rounded animate-pulse"></span>
+                  <span className="text-xs text-gray-300 font-medium">Critical</span>
+                </div>
+                <span className="text-sm font-bold text-red-400">{criticalCount}</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Ward Hotspots - Top Right */}
+          <div className="absolute top-4 right-4 bg-slate-800/95 backdrop-blur rounded-lg shadow-lg border border-slate-700 p-3 min-w-[180px] z-40">
+            <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2">🎯 Hotspot Wards</div>
+            <div className="space-y-2">
+              {topWards.map(([ward, count], idx) => (
+                <div key={ward} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-bold ${idx === 0 ? 'text-red-400' : idx === 1 ? 'text-orange-400' : 'text-yellow-400'}`}>#{idx + 1}</span>
+                    <span className="text-xs text-gray-300">Ward {ward}</span>
+                  </div>
+                  <span className="text-xs font-bold text-white bg-slate-600 px-1.5 py-0.5 rounded">{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Category Distribution - Bottom Right */}
+          <div className="absolute bottom-4 right-4 bg-slate-800/95 backdrop-blur rounded-lg shadow-lg border border-slate-700 p-3 min-w-[200px] z-40">
+            <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2">🏷️ By Category</div>
+            <div className="space-y-1.5">
+              {topCategories.map(([cat, count]) => (
+                <div key={cat} className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <div className="flex justify-between text-[10px] mb-0.5">
+                      <span className="text-gray-300 capitalize truncate">{cat}</span>
+                      <span className="text-white font-bold">{count}</span>
+                    </div>
+                    <div className="w-full bg-slate-700 rounded-full h-1">
+                      <div className="bg-blue-500 h-1 rounded-full" style={{width: `${Math.min((count / incidents.length) * 100, 100)}%`}}></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Admin Actions Panel - Bottom Left */}
+          <div className="absolute bottom-4 left-4 flex items-center gap-2 z-40">
+            <div className="bg-green-600/95 backdrop-blur rounded-lg shadow-sm border border-green-500 p-2 px-3 flex items-center space-x-2">
+              <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+              <div className="text-xs font-bold text-white">LIVE SYNC</div>
+            </div>
+            <div className="bg-slate-800/95 backdrop-blur rounded-lg shadow-lg border border-slate-700 p-2 flex gap-2">
+              <button className="text-[10px] bg-slate-700 text-white px-2.5 py-1.5 rounded hover:bg-slate-600 font-medium transition">🔔 Alerts</button>
+              <button className="text-[10px] bg-slate-700 text-white px-2.5 py-1.5 rounded hover:bg-slate-600 font-medium transition">👥 Assign</button>
+              <button className="text-[10px] bg-red-600 text-white px-2.5 py-1.5 rounded hover:bg-red-700 font-medium transition">🚨 Emergency</button>
+            </div>
+          </div>
        </div>
     </div>
   );

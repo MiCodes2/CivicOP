@@ -115,26 +115,40 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false, pulse
   const THEME_TRANSPORT = process.env.NEXT_PUBLIC_THEME_TRANSPORT || '#D32F2F';
   const THEME_GREENSPACE = process.env.NEXT_PUBLIC_THEME_GREEN || '#388E3C';
 
-  // Get marker color based on severity (1-5)
-  const getMarkerColor = (severity) => {
+  // Get marker color based on severity (1-5) and status
+  const getMarkerColor = (severity, status) => {
+    const normalizedStatus = (status || '').toUpperCase();
+    // Status-based colors take priority
+    if (normalizedStatus === 'RESOLVED' || normalizedStatus === 'CLOSED') return '#10B981'; // Green
+    if (normalizedStatus === 'IN_PROGRESS') return '#3B82F6'; // Blue
+    // Then severity-based for OPEN status
     if (severity >= 4) return '#DC2626'; // Red for high severity (4-5)
     if (severity === 3) return '#F59E0B'; // Orange for medium (3)
     if (severity === 2) return '#FCD34D'; // Yellow for minor (2)
-    return '#10B981'; // Green for low (1)
+    return '#F97316'; // Orange for default OPEN
   };
 
   // Create custom icon based on severity with enhanced styling and animation
   const createSeverityIcon = (severity, status) => {
-    // If issue is RESOLVED, force green pulse/color regardless of severity
-    const resolvedColor = '#10B981'
-    const color = (status === 'RESOLVED' || status === 'resolved') ? resolvedColor : getMarkerColor(severity)
+    const normalizedStatus = (status || '').toUpperCase()
+    const isResolved = normalizedStatus === 'RESOLVED' || normalizedStatus === 'CLOSED'
+    const isInProgress = normalizedStatus === 'IN_PROGRESS'
+    const color = getMarkerColor(severity, status)
     const severityLabels = ['', 'Low', 'Minor', 'Medium', 'High', 'Critical']
-    const severityLabel = severityLabels[severity] || 'Medium'
-    const emoji = status === 'RESOLVED' || status === 'resolved' ? '✅' : (severity >= 4 ? '🚨' : severity === 3 ? '⚠️' : severity === 2 ? '⚡' : '✓')
+    const severityLabel = isResolved ? 'Resolved' : (isInProgress ? 'In Progress' : severityLabels[severity] || 'Open')
     
-    // More intense animation for high severity
-    const animationDuration = severity >= 4 ? '1.2s' : '2s'
-    const pulseOpacity = status === 'RESOLVED' ? 0.6 : (severity >= 4 ? 0.8 : 0.6)
+    // Status-based emoji
+    let emoji = '📋'; // Default
+    if (isResolved) emoji = '✅';
+    else if (isInProgress) emoji = '🔧';
+    else if (severity >= 4) emoji = '🚨';
+    else if (severity === 3) emoji = '⚠️';
+    else if (severity === 2) emoji = '⚡';
+    else emoji = '📌';
+    
+    // Animation speed based on urgency
+    const animationDuration = isResolved ? '3s' : (isInProgress ? '2.5s' : (severity >= 4 ? '1.2s' : '2s'))
+    const pulseOpacity = isResolved ? 0.5 : (severity >= 4 ? 0.8 : 0.6)
 
     // Optional override for pulse color (e.g., home page wants green pulses)
     const pulse = pulseColor || color;
@@ -252,12 +266,13 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false, pulse
                       {incident.category ? incident.category.charAt(0).toUpperCase() + incident.category.slice(1) : 'Issue'}
                     </h3>
                     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                      incident.status === 'OPEN' ? 'bg-orange-100 text-orange-800' :
-                      incident.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
-                      incident.status === 'RESOLVED' ? 'bg-green-100 text-green-800' :
-                      incident.status === 'CLOSED' ? 'bg-gray-100 text-gray-800' :
+                      (incident.status || '').toUpperCase() === 'OPEN' || !incident.status ? 'bg-orange-100 text-orange-800' :
+                      (incident.status || '').toUpperCase() === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
+                      (incident.status || '').toUpperCase() === 'RESOLVED' || (incident.status || '').toUpperCase() === 'CLOSED' ? 'bg-green-100 text-green-800' :
                       'bg-gray-100 text-gray-700'
                     }`}>
+                      {(incident.status || '').toUpperCase() === 'RESOLVED' || (incident.status || '').toUpperCase() === 'CLOSED' ? '✅ ' : ''}
+                      {(incident.status || '').toUpperCase() === 'IN_PROGRESS' ? '🔧 ' : ''}
                       {incident.status || 'OPEN'}
                     </span>
                   </div>
@@ -300,22 +315,32 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false, pulse
                     </div>
                   )}
                   
-                  {/* Severity and timestamp */}
+                  {/* Severity/Status and timestamp */}
                   <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs font-medium text-gray-600">Severity:</span>
-                      <div className="flex gap-0.5">
-                        {[...Array(5)].map((_, i) => (
-                          <div
-                            key={i}
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              i < incident.severity ? 'bg-red-500' : 'bg-gray-300'
-                            }`}
-                          />
-                        ))}
+                    {((incident.status || '').toUpperCase() === 'RESOLVED' || (incident.status || '').toUpperCase() === 'CLOSED') ? (
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs font-medium text-green-600">✅ Resolved</span>
                       </div>
-                      <span className="text-xs text-gray-600 ml-1">{incident.severity || 3}/5</span>
-                    </div>
+                    ) : (incident.status || '').toUpperCase() === 'IN_PROGRESS' ? (
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs font-medium text-blue-600">🔧 In Progress</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs font-medium text-gray-600">Severity:</span>
+                        <div className="flex gap-0.5">
+                          {[...Array(5)].map((_, i) => (
+                            <div
+                              key={i}
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                i < (incident.severity || 3) ? (incident.severity >= 4 ? 'bg-red-500' : incident.severity === 3 ? 'bg-orange-500' : 'bg-yellow-500') : 'bg-gray-300'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-xs text-gray-600 ml-1">{incident.severity || 3}/5</span>
+                      </div>
+                    )}
                     <span className="text-xs text-gray-500">
                       {new Date(incident.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
                     </span>

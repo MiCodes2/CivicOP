@@ -1,23 +1,20 @@
 import { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { supabase } from '../lib/supabase';
 
 export default function Tickets() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Fetch tickets from Supabase
   useEffect(() => {
     fetchTickets();
     
-    // Set up real-time subscription
     const subscription = supabase
       .channel('civic_issues_tickets')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'civic_issues' 
-      }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'civic_issues' }, (payload) => {
         if (payload.eventType === 'INSERT') {
           setTickets(prev => [payload.new, ...prev]);
         } else if (payload.eventType === 'UPDATE') {
@@ -28,9 +25,7 @@ export default function Tickets() {
       })
       .subscribe();
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => { subscription.unsubscribe(); };
   }, []);
 
   const fetchTickets = async () => {
@@ -46,7 +41,6 @@ export default function Tickets() {
       setTickets(data || []);
       setError(null);
     } catch (err) {
-      console.error('Error fetching tickets:', err);
       setError('Failed to load tickets');
     } finally {
       setLoading(false);
@@ -55,118 +49,217 @@ export default function Tickets() {
 
   const counts = useMemo(() => {
     return tickets.reduce((acc, t) => { 
-      acc[t.status] = (acc[t.status] || 0) + 1; 
+      const status = (t.status || 'OPEN').toUpperCase();
+      acc[status] = (acc[status] || 0) + 1; 
       return acc; 
     }, {});
   }, [tickets]);
 
+  const filteredTickets = useMemo(() => {
+    let result = tickets;
+    if (activeFilter !== 'all') {
+      result = result.filter(t => (t.status || 'OPEN').toUpperCase() === activeFilter);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(t => 
+        (t.category || '').toLowerCase().includes(q) ||
+        (t.description || '').toLowerCase().includes(q) ||
+        (t.address || '').toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [tickets, activeFilter, searchQuery]);
+
+  const catIcons = { 'Pothole': '🕳️', 'Garbage': '🗑️', 'Streetlight': '💡', 'Water Leak': '💧', 'Road Damage': '🚧', 'Other': '📍' };
+  const statusColors = { 'OPEN': 'bg-orange-100 text-orange-700 border-orange-200', 'IN_PROGRESS': 'bg-blue-100 text-blue-700 border-blue-200', 'RESOLVED': 'bg-green-100 text-green-700 border-green-200', 'CLOSED': 'bg-gray-100 text-gray-600 border-gray-200' };
+  const severityColors = ['bg-green-100 text-green-700', 'bg-yellow-100 text-yellow-700', 'bg-orange-100 text-orange-700', 'bg-red-100 text-red-700', 'bg-red-200 text-red-800'];
+
+  const filters = [
+    { key: 'all', label: 'All', icon: '📋', count: tickets.length },
+    { key: 'OPEN', label: 'Open', icon: '📌', count: counts.OPEN || 0 },
+    { key: 'IN_PROGRESS', label: 'In Progress', icon: '🔧', count: counts.IN_PROGRESS || 0 },
+    { key: 'RESOLVED', label: 'Resolved', icon: '✅', count: counts.RESOLVED || 0 },
+  ];
+
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-2xl font-bold">Tickets</h1>
-          <p className="text-sm text-gray-600">All reported civic issues tracked as tickets.</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900">Public Tickets</h1>
+              <p className="text-sm text-gray-600 mt-0.5">Browse all reported civic issues in Bengaluru</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                LIVE
+              </span>
+              <button onClick={fetchTickets} className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition" title="Refresh">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <div className="text-sm text-blue-600 font-medium">Total Issues</div>
-          <div className="text-3xl font-bold text-blue-900">{tickets.length}</div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Filter Tabs */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {filters.map(f => (
+            <button key={f.key} onClick={() => setActiveFilter(f.key)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition ${activeFilter === f.key ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-gray-700 hover:bg-gray-100 border'}`}>
+              <span>{f.icon}</span>
+              <span className="hidden sm:inline">{f.label}</span>
+              <span className={`px-1.5 py-0.5 rounded text-xs ${activeFilter === f.key ? 'bg-blue-500' : 'bg-gray-100'}`}>{f.count}</span>
+            </button>
+          ))}
         </div>
-        <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-          <div className="text-sm text-orange-600 font-medium">Open</div>
-          <div className="text-3xl font-bold text-orange-900">{counts.OPEN || 0}</div>
-        </div>
-        <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-          <div className="text-sm text-yellow-600 font-medium">In Progress</div>
-          <div className="text-3xl font-bold text-yellow-900">{counts.IN_PROGRESS || 0}</div>
-        </div>
-        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-          <div className="text-sm text-green-600 font-medium">Resolved</div>
-          <div className="text-3xl font-bold text-green-900">{counts.RESOLVED || 0}</div>
-        </div>
-        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <div className="text-sm text-gray-600 font-medium">Closed</div>
-          <div className="text-3xl font-bold text-gray-900">{counts.CLOSED || 0}</div>
-        </div>
-      </div>
 
-      <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
-        <div className="p-4 border-b bg-gray-50">
-          <h2 className="font-semibold text-gray-900">All Issues</h2>
+        {/* Search */}
+        <div className="mb-6">
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search by category, description, or location..." className="w-full pl-10 pr-4 py-2.5 bg-white border rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            )}
+          </div>
         </div>
-        
+
+        {/* Stats Summary */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <div className="bg-white rounded-xl border p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-xl">📊</div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900">{tickets.length}</p>
+                <p className="text-xs text-gray-500">Total Issues</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center text-xl">📌</div>
+              <div>
+                <p className="text-2xl font-bold text-orange-600">{counts.OPEN || 0}</p>
+                <p className="text-xs text-gray-500">Open</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-xl">🔧</div>
+              <div>
+                <p className="text-2xl font-bold text-blue-600">{counts.IN_PROGRESS || 0}</p>
+                <p className="text-xs text-gray-500">In Progress</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center text-xl">✅</div>
+              <div>
+                <p className="text-2xl font-bold text-green-600">{counts.RESOLVED || 0}</p>
+                <p className="text-xs text-gray-500">Resolved</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Results Info */}
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-sm text-gray-600">
+            Showing <span className="font-semibold">{filteredTickets.length}</span> {filteredTickets.length === 1 ? 'issue' : 'issues'}
+            {activeFilter !== 'all' && <span className="text-gray-400"> • Filtered by {activeFilter.replace('_', ' ')}</span>}
+          </p>
+        </div>
+
+        {/* Tickets Grid */}
         {loading ? (
-          <div className="p-8 text-center text-gray-500">
-            <div className="text-2xl mb-2">⏳</div>
-            Loading issues...
-          </div>
+          <div className="text-center py-16"><div className="text-4xl mb-3">⏳</div><p className="text-gray-600">Loading tickets...</p></div>
         ) : error ? (
-          <div className="p-8 text-center text-red-500">
-            <div className="text-2xl mb-2">⚠️</div>
-            {error}
-          </div>
-        ) : tickets.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            <div className="text-2xl mb-2">📭</div>
-            No issues yet
+          <div className="text-center py-16"><div className="text-4xl mb-3">⚠️</div><p className="text-red-600">{error}</p></div>
+        ) : filteredTickets.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-xl border">
+            <div className="text-4xl mb-3">📭</div>
+            <p className="text-gray-600 font-medium">No tickets found</p>
+            <p className="text-sm text-gray-500 mt-1">{searchQuery ? 'Try a different search term' : 'No issues match your filter'}</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200 max-h-[calc(100vh-400px)] overflow-y-auto">
-            {tickets.map(ticket => (
-              <div key={ticket.id} className="p-4 hover:bg-gray-50 transition">
-                <div className="flex justify-between items-start gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredTickets.map(ticket => {
+              const status = (ticket.status || 'OPEN').toUpperCase();
+              const severity = ticket.severity || 3;
+              return (
+                <div key={ticket.id} className="bg-white rounded-xl border shadow-sm hover:shadow-md transition overflow-hidden">
                   {ticket.image_url && (
-                    <img 
-                      src={ticket.image_url} 
-                      alt={ticket.category}
-                      className="w-16 h-16 rounded object-cover flex-shrink-0"
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{ticket.category || 'Issue'}</h3>
-                        <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{ticket.description || 'No description'}</p>
+                    <div className="h-32 bg-gray-100 relative">
+                      <img src={ticket.image_url} alt={ticket.category} className="w-full h-full object-cover" />
+                      <div className="absolute top-2 right-2">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusColors[status] || statusColors['OPEN']}`}>{status.replace('_', ' ')}</span>
                       </div>
                     </div>
-                    
-                    <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                      {ticket.address && (
-                        <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded">📍 {ticket.address.split(',')[0]}</span>
-                      )}
-                      {ticket.ward_number && (
-                        <span className="px-2 py-1 bg-purple-50 text-purple-700 rounded">🏛️ {ticket.ward_number}</span>
-                      )}
-                      <span className={`px-2 py-1 rounded font-medium ${
-                        ticket.severity >= 4 ? 'bg-red-100 text-red-800' :
-                        ticket.severity === 3 ? 'bg-orange-100 text-orange-800' :
-                        ticket.severity === 2 ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-green-100 text-green-800'
-                      }`}>⚠️ {ticket.severity}/5</span>
+                  )}
+                  <div className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 text-xl">{catIcons[ticket.category] || '📍'}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-gray-900 truncate">{ticket.category || 'Issue'}</h3>
+                          {!ticket.image_url && (
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${statusColors[status] || statusColors['OPEN']}`}>{status.replace('_', ' ')}</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1 line-clamp-2">{ticket.description || 'No description provided'}</p>
+                      </div>
                     </div>
-                    
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                        ticket.status === 'OPEN' ? 'bg-orange-100 text-orange-800' :
-                        ticket.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
-                        ticket.status === 'RESOLVED' ? 'bg-green-100 text-green-800' :
-                        ticket.status === 'CLOSED' ? 'bg-gray-100 text-gray-800' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {ticket.status || 'OPEN'}
+                    <div className="mt-3 pt-3 border-t flex flex-wrap gap-2">
+                      {ticket.address && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded text-[10px]">
+                          <span>📍</span>{ticket.address.split(',')[0]}
+                        </span>
+                      )}
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium ${severityColors[severity - 1] || severityColors[2]}`}>
+                        ⚡ Severity {severity}/5
                       </span>
-                      <span className="text-xs text-gray-500">
-                        {new Date(ticket.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: '2-digit' })}
-                      </span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                      <span>{new Date(ticket.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
+                      {ticket.ward_number && <span className="text-purple-600">Ward {ticket.ward_number}</span>}
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
+
+        {/* Quick Nav */}
+        <div className="mt-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-5 text-white">
+          <h3 className="text-sm font-semibold mb-3">Quick Navigation</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Link href="/" className="flex flex-col items-center p-3 bg-white/10 hover:bg-white/20 rounded-lg transition">
+              <span className="text-2xl mb-1">🏠</span><span className="text-xs font-medium">Home</span>
+            </Link>
+            <Link href="/dashboard" className="flex flex-col items-center p-3 bg-white/10 hover:bg-white/20 rounded-lg transition">
+              <span className="text-2xl mb-1">📊</span><span className="text-xs font-medium">Dashboard</span>
+            </Link>
+            <Link href="/map-view" className="flex flex-col items-center p-3 bg-white/10 hover:bg-white/20 rounded-lg transition">
+              <span className="text-2xl mb-1">🗺️</span><span className="text-xs font-medium">Full Map</span>
+            </Link>
+            <Link href="/governance" className="flex flex-col items-center p-3 bg-white/10 hover:bg-white/20 rounded-lg transition">
+              <span className="text-2xl mb-1">🏛️</span><span className="text-xs font-medium">Governance</span>
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   );

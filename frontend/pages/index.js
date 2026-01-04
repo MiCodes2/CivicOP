@@ -22,6 +22,7 @@ export default function Home() {
   const [showCamera, setShowCamera] = useState(false);
   const [showReportForm, setShowReportForm] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
+  const [activeTab, setActiveTab] = useState('recent'); // recent, stats, info
 
   // Fetch incidents from Supabase
   useEffect(() => {
@@ -123,113 +124,328 @@ export default function Home() {
     setShowReportForm(false);
   };
 
+  // Calculate stats
+  const openCount = incidents.filter(i => i.status === 'OPEN' || !i.status).length;
+  const inProgressCount = incidents.filter(i => i.status === 'IN_PROGRESS').length;
+  const resolvedCount = incidents.filter(i => i.status === 'RESOLVED' || i.status === 'CLOSED').length;
+  const criticalCount = incidents.filter(i => i.severity >= 4).length;
+
   return (
     <div className="flex-1 flex flex-col h-full" style={{ backgroundColor: 'var(--theme-bg)' }}>
       <main className="flex flex-1 overflow-hidden h-full w-full">
         <section className="flex-1 pb-0 min-h-0 h-full w-full">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 h-full w-full px-3 py-3 md:px-4 md:py-3">
-          {/* Map Section - Takes full width on mobile, 2.5 cols on desktop */}
-          <div className="bg-white rounded-lg shadow-sm border flex flex-col lg:col-span-3 w-full h-full min-h-0">
+          {/* Map Section - Takes full width on mobile, 3 cols on desktop */}
+          <div className="bg-white rounded-lg shadow-sm border flex flex-col lg:col-span-3 w-full h-full min-h-0 relative">
             <div className="px-4 pt-3 pb-2 border-b flex-shrink-0 bg-gradient-to-r from-blue-50 to-transparent">
               <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-base md:text-lg font-bold text-gray-900 m-0 flex items-center gap-2">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-base md:text-lg font-bold text-gray-900 m-0">
                     📍 Bengaluru City Overview
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">
-                      🟢 {incidents.length}
-                    </span>
                   </h2>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded-full">
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                    LIVE
+                  </span>
+                </div>
+                {/* Live Stats - Hidden on mobile */}
+                <div className="hidden md:flex items-center gap-2">
+                  <div className="flex items-center gap-1 px-2 py-1 bg-orange-50 rounded text-xs">
+                    <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+                    <span className="font-semibold text-orange-700">{openCount}</span>
+                    <span className="text-orange-600">Open</span>
+                  </div>
+                  <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded text-xs">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                    <span className="font-semibold text-blue-700">{inProgressCount}</span>
+                    <span className="text-blue-600">WIP</span>
+                  </div>
+                  <div className="flex items-center gap-1 px-2 py-1 bg-green-50 rounded text-xs">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    <span className="font-semibold text-green-700">{resolvedCount}</span>
+                    <span className="text-green-600">Done</span>
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="flex-1 overflow-hidden min-h-0">
-              <DynamicMap incidents={incidents} userLocation={userLocation} fillHeight pulseColor="#10B981" />
+            <div className="flex-1 overflow-hidden min-h-0 relative">
+              <DynamicMap incidents={incidents} userLocation={userLocation} fillHeight />
+              
+              {/* Live Stats Overlay - Mobile only (bottom of map) */}
+              <div className="md:hidden absolute bottom-3 left-3 right-3 bg-white/95 backdrop-blur rounded-lg shadow-lg p-2 z-40">
+                <div className="flex items-center justify-around text-xs">
+                  <div className="flex flex-col items-center">
+                    <span className="font-bold text-orange-600 text-sm">{openCount}</span>
+                    <span className="text-gray-500">Open</span>
+                  </div>
+                  <div className="w-px h-6 bg-gray-200"></div>
+                  <div className="flex flex-col items-center">
+                    <span className="font-bold text-blue-600 text-sm">{inProgressCount}</span>
+                    <span className="text-gray-500">In Progress</span>
+                  </div>
+                  <div className="w-px h-6 bg-gray-200"></div>
+                  <div className="flex flex-col items-center">
+                    <span className="font-bold text-green-600 text-sm">{resolvedCount}</span>
+                    <span className="text-gray-500">Resolved</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Recent Incidents List - Hidden on mobile */}
-          <div className="hidden lg:flex bg-white rounded-lg shadow-sm border flex-col w-full h-full min-h-0">
-            {/* Bengaluru Pilot Banner - Above Recent Reports */}
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-1.5 flex items-center justify-center gap-2 text-xs font-medium">
-              <span>🧪 Bengaluru Pilot</span>
+          {/* Sidebar - Hidden on mobile */}
+          <div className="hidden lg:flex bg-white rounded-lg shadow-sm border flex-col w-full h-full min-h-0 overflow-hidden">
+            {/* Tab Navigation */}
+            <div className="flex border-b bg-gray-50 shrink-0">
+              <button 
+                onClick={() => setActiveTab('recent')}
+                className={`flex-1 px-3 py-2.5 text-xs font-semibold transition-all ${
+                  activeTab === 'recent' 
+                    ? 'text-blue-700 border-b-2 border-blue-600 bg-white' 
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                📋 Recent
+              </button>
+              <button 
+                onClick={() => setActiveTab('stats')}
+                className={`flex-1 px-3 py-2.5 text-xs font-semibold transition-all ${
+                  activeTab === 'stats' 
+                    ? 'text-blue-700 border-b-2 border-blue-600 bg-white' 
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                📊 Stats
+              </button>
+              <button 
+                onClick={() => setActiveTab('info')}
+                className={`flex-1 px-3 py-2.5 text-xs font-semibold transition-all ${
+                  activeTab === 'info' 
+                    ? 'text-blue-700 border-b-2 border-blue-600 bg-white' 
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                ℹ️ Info
+              </button>
             </div>
-            <div className="px-4 py-2 border-b flex-shrink-0">
-              <h3 className="text-sm md:text-base font-semibold text-gray-900 m-0">Recent Reports</h3>
-            </div>
+            
+            {/* Tab Content */}
             <div className="flex-1 overflow-y-auto min-h-0">
-              <div className="divide-y divide-gray-200">
-                {incidents.length === 0 ? (
-                  <div className="p-8 text-center h-full flex flex-col items-center justify-center">
-                    <div className="text-4xl mb-3">📋</div>
-                    <p className="text-gray-600 font-medium">No issues reported yet</p>
-                    <p className="text-xs text-gray-500 mt-1">Click the red button to report an issue</p>
-                  </div>
-                ) : (
-                  incidents.map((incident) => (
-                    <div key={incident.id} className="p-4 hover:bg-gray-50 transition border-b last:border-b-0">
-                      <div className="flex justify-between items-start gap-3">
-                        {incident.image_url && (
-                          <img 
-                            src={incident.image_url} 
-                            alt={incident.category}
-                            className="w-16 h-16 rounded object-cover flex-shrink-0"
-                          />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between">
-                            <h4 className="text-sm font-medium text-gray-900 truncate">
-                              {incident.category || 'Issue'}
-                            </h4>
-                            <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0 ${
-                              incident.severity >= 4 ? 'bg-red-100 text-red-800' :
-                              incident.severity === 3 ? 'bg-orange-100 text-orange-800' :
-                              incident.severity === 2 ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-green-100 text-green-800'
-                            }`}>
-                              {incident.severity ? `${incident.severity}/5` : '3/5'}
-                            </span>
-                          </div>
-                          <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                            {incident.description || 'No description provided'}
-                          </p>
-                          {/* Location and Ward */}
-                          {(incident.address || incident.ward_number || incident.latitude) && (
-                            <div className="mt-1 text-xs text-gray-500 flex flex-col gap-0.5">
-                              {incident.address && (
-                                <span className="truncate" title={incident.address}>
-                                  📍 {incident.address}
+              
+              {/* RECENT TAB */}
+              {activeTab === 'recent' && (
+                <div className="divide-y divide-gray-100">
+                  {incidents.length === 0 ? (
+                    <div className="p-8 text-center flex flex-col items-center justify-center">
+                      <div className="text-4xl mb-3">📋</div>
+                      <p className="text-gray-600 font-medium">No issues reported yet</p>
+                      <p className="text-xs text-gray-500 mt-1">Click the red button to report an issue</p>
+                    </div>
+                  ) : (
+                    incidents.slice(0, 10).map((incident) => {
+                      const statusColors = {
+                        'OPEN': 'bg-orange-100 text-orange-700',
+                        'IN_PROGRESS': 'bg-blue-100 text-blue-700',
+                        'RESOLVED': 'bg-green-100 text-green-700',
+                        'CLOSED': 'bg-gray-100 text-gray-700'
+                      };
+                      const status = (incident.status || 'OPEN').toUpperCase();
+                      return (
+                        <div key={incident.id} className="p-3 hover:bg-gray-50 transition">
+                          <div className="flex gap-3">
+                            {incident.image_url ? (
+                              <img 
+                                src={incident.image_url} 
+                                alt={incident.category}
+                                className="w-14 h-14 rounded-lg object-cover flex-shrink-0 border"
+                              />
+                            ) : (
+                              <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-xl">
+                                {incident.category === 'Pothole' ? '🕳️' :
+                                 incident.category === 'Garbage' ? '🗑️' :
+                                 incident.category === 'Streetlight' ? '💡' :
+                                 incident.category === 'Water Leak' ? '💧' : '📍'}
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <h4 className="text-sm font-semibold text-gray-900 truncate">
+                                  {incident.category || 'Issue'}
+                                </h4>
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${statusColors[status] || statusColors['OPEN']}`}>
+                                  {status === 'RESOLVED' ? '✅' : status === 'IN_PROGRESS' ? '🔧' : ''} {status}
                                 </span>
-                              )}
-                              {!incident.address && incident.latitude && (
-                                <span>
-                                  📍 {incident.latitude.toFixed(4)}, {incident.longitude.toFixed(4)}
+                              </div>
+                              <p className="text-xs text-gray-600 mt-0.5 line-clamp-1">
+                                {incident.description || 'No description'}
+                              </p>
+                              <div className="flex items-center justify-between mt-1.5">
+                                <span className="text-[10px] text-gray-500 truncate max-w-[120px]">
+                                  📍 {incident.address || `${incident.latitude?.toFixed(3)}, ${incident.longitude?.toFixed(3)}`}
                                 </span>
-                              )}
-                              {incident.ward_number && (
-                                <span>🏛️ {incident.ward_number}</span>
-                              )}
+                                <span className="text-[10px] text-gray-400">
+                                  {new Date(incident.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                </span>
+                              </div>
                             </div>
-                          )}
-                          <div className="flex items-center mt-2 space-x-2">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                              incident.status === 'OPEN' ? 'bg-orange-50 text-orange-700' :
-                              incident.status === 'IN_PROGRESS' ? 'bg-blue-50 text-blue-700' :
-                              incident.status === 'RESOLVED' ? 'bg-green-50 text-green-700' :
-                              incident.status === 'CLOSED' ? 'bg-gray-50 text-gray-700' :
-                              'bg-orange-50 text-orange-700'
-                            }`}>
-                              {incident.status || 'OPEN'}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {new Date(incident.created_at).toLocaleDateString()}
-                            </span>
                           </div>
                         </div>
+                      );
+                    })
+                  )}
+                  {incidents.length > 10 && (
+                    <div className="p-3 text-center">
+                      <Link href="/tickets" className="text-xs text-blue-600 hover:text-blue-800 font-medium">
+                        View all {incidents.length} reports →
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* STATS TAB */}
+              {activeTab === 'stats' && (
+                <div className="p-4 space-y-4">
+                  {/* Status Summary */}
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Issue Status</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-orange-50 rounded-lg p-3 text-center border border-orange-100">
+                        <div className="text-2xl font-bold text-orange-600">{openCount}</div>
+                        <div className="text-[10px] text-orange-700 font-medium">Open</div>
+                      </div>
+                      <div className="bg-blue-50 rounded-lg p-3 text-center border border-blue-100">
+                        <div className="text-2xl font-bold text-blue-600">{inProgressCount}</div>
+                        <div className="text-[10px] text-blue-700 font-medium">In Progress</div>
+                      </div>
+                      <div className="bg-green-50 rounded-lg p-3 text-center border border-green-100">
+                        <div className="text-2xl font-bold text-green-600">{resolvedCount}</div>
+                        <div className="text-[10px] text-green-700 font-medium">Resolved</div>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-3 text-center border border-gray-200">
+                        <div className="text-2xl font-bold text-gray-700">{incidents.length}</div>
+                        <div className="text-[10px] text-gray-600 font-medium">Total</div>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
+                  </div>
+                  
+                  {/* Category Breakdown */}
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">By Category</h4>
+                    <div className="space-y-2">
+                      {Object.entries(
+                        incidents.reduce((acc, i) => {
+                          const cat = i.category || 'Other';
+                          acc[cat] = (acc[cat] || 0) + 1;
+                          return acc;
+                        }, {})
+                      ).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([cat, count]) => (
+                        <div key={cat} className="flex items-center justify-between">
+                          <span className="text-xs text-gray-700 capitalize">{cat}</span>
+                          <div className="flex items-center gap-2">
+                            <div className="w-16 bg-gray-100 rounded-full h-1.5">
+                              <div 
+                                className="bg-blue-500 h-1.5 rounded-full" 
+                                style={{width: `${Math.min((count / incidents.length) * 100, 100)}%`}}
+                              ></div>
+                            </div>
+                            <span className="text-xs font-bold text-gray-700 w-5 text-right">{count}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Resolution Rate */}
+                  <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-3 border border-green-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-gray-700">Resolution Rate</span>
+                      <span className="text-lg font-bold text-green-600">
+                        {incidents.length > 0 ? Math.round((resolvedCount / incidents.length) * 100) : 0}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                      <div 
+                        className="bg-gradient-to-r from-green-500 to-green-400 h-2 rounded-full transition-all duration-500" 
+                        style={{width: `${incidents.length > 0 ? (resolvedCount / incidents.length) * 100 : 0}%`}}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* INFO TAB */}
+              {activeTab === 'info' && (
+                <div className="p-4 space-y-4">
+                  {/* About Section */}
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-900 mb-2">🏛️ About CivicOP</h4>
+                    <p className="text-xs text-gray-600 leading-relaxed">
+                      CivicOP is a citizen-powered platform for reporting and tracking civic issues in Bengaluru. 
+                      Report potholes, garbage, streetlights, water leaks, and more.
+                    </p>
+                  </div>
+                  
+                  {/* How It Works */}
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-900 mb-2">📱 How It Works</h4>
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-bold shrink-0">1</div>
+                        <p className="text-xs text-gray-600">Spot a civic issue in your area</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-bold shrink-0">2</div>
+                        <p className="text-xs text-gray-600">Click the red button to report with photo & location</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-bold shrink-0">3</div>
+                        <p className="text-xs text-gray-600">Track status as authorities resolve the issue</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Contact */}
+                  <div className="bg-gray-50 rounded-lg p-3 border">
+                    <h4 className="text-xs font-bold text-gray-700 mb-2">📞 Contact Us</h4>
+                    <div className="space-y-2 text-xs">
+                      <a href="https://civicopindia.com/contact" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline transition">
+                        <span>📧</span>
+                        <span>Contact Page</span>
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                      </a>
+                      <a href="https://civicopindia.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline transition">
+                        <span>🌐</span>
+                        <span>civicopindia.com</span>
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                      </a>
+                    </div>
+                  </div>
+                  
+                  {/* Quick Links */}
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-700 mb-2">🔗 Quick Links</h4>
+                    <div className="flex flex-wrap gap-2">
+                      <Link href="/tickets" className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition">
+                        All Tickets
+                      </Link>
+                      <Link href="/dashboard" className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition">
+                        Dashboard
+                      </Link>
+                      <Link href="/map-view" className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition">
+                        Full Map
+                      </Link>
+                    </div>
+                  </div>
+                  
+                  {/* Pilot Badge */}
+                  <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-3 text-center">
+                    <div className="text-lg mb-1">🧪</div>
+                    <div className="text-xs font-bold">Bengaluru Pilot Program</div>
+                    <div className="text-[10px] opacity-80 mt-0.5">Currently serving Bengaluru city</div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
