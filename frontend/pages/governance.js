@@ -1107,7 +1107,7 @@ function MapView({ incidents = [] }) {
             <div className="flex items-center justify-center h-full text-gray-500 text-sm">Loading map data...</div>
           ) : (
             <DynamicMap incidents={filteredIncidents} userLocation={null} fillHeight />
-          )}}
+          )}
           
           {/* Admin Stats Panel - Left - Hidden on mobile */}
           <div className="hidden lg:block absolute top-4 left-4 bg-slate-800/95 backdrop-blur rounded-lg shadow-lg border border-slate-700 p-3 min-w-[200px] z-40">
