@@ -188,6 +188,30 @@ export const authHelpers = {
     return data
   },
 
+  // Sign in with either email or username
+  async signInWithEmailOrUsername(emailOrUsername: string, password: string) {
+    let email = emailOrUsername
+
+    // Check if input looks like a username (no @ symbol) and not an email
+    if (!emailOrUsername.includes('@')) {
+      // Look up user by username to get their email
+      const { data, error } = await supabase
+        .from('users')
+        .select('email')
+        .eq('username', emailOrUsername)
+        .single()
+
+      if (error || !data) {
+        throw new Error(`User with username '${emailOrUsername}' not found`)
+      }
+
+      email = data.email
+    }
+
+    // Now sign in with the email
+    return this.signIn(email, password)
+  },
+
   async signOut() {
     const { error } = await supabase.auth.signOut()
     if (error) throw error

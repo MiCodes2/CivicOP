@@ -36,7 +36,8 @@ CREATE INDEX IF NOT EXISTS idx_wards_city ON wards(city);
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
-    hashed_password VARCHAR(255) NOT NULL,
+    username VARCHAR(100) UNIQUE, -- Short alias for login (e.g., 'civic_admin')
+    hashed_password VARCHAR(255) DEFAULT NULL, -- Passwords managed by Supabase Auth
     full_name VARCHAR(255),
     phone VARCHAR(20),
     role VARCHAR(50) DEFAULT 'citizen' CHECK (role IN ('citizen', 'official', 'admin')),
@@ -47,6 +48,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_ward_id ON users(ward_id);
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at DESC);
@@ -178,6 +180,10 @@ CREATE POLICY "Users can view own data" ON users
 CREATE POLICY "Users can update own data" ON users
     FOR UPDATE USING (auth.uid() = id);
 
+-- USERS: Public can lookup by username or email (for login purposes)
+CREATE POLICY "Public can lookup users by email or username" ON users
+    FOR SELECT USING (true);
+
 -- CIVIC_ISSUES: Public anonymous reporting and viewing
 CREATE POLICY "Allow public insert on civic_issues" ON civic_issues
     FOR INSERT WITH CHECK (true);
@@ -185,8 +191,25 @@ CREATE POLICY "Allow public insert on civic_issues" ON civic_issues
 CREATE POLICY "Allow public select on civic_issues" ON civic_issues
     FOR SELECT USING (true);
 
-CREATE POLICY "Allow authenticated update on civic_issues" ON civic_issues
-    FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow admin update on civic_issues" ON civic_issues
+    FOR UPDATE USING (
+        auth.role() = 'authenticated' 
+        AND EXISTS (
+            SELECT 1 FROM users 
+            WHERE users.id = auth.uid() 
+            AND users.role = 'admin'
+        )
+    );
+
+CREATE POLICY "Allow admin delete on civic_issues" ON civic_issues
+    FOR DELETE USING (
+        auth.role() = 'authenticated' 
+        AND EXISTS (
+            SELECT 1 FROM users 
+            WHERE users.id = auth.uid() 
+            AND users.role = 'admin'
+        )
+    );
 
 -- AI_ANALYSIS: Authenticated users only
 CREATE POLICY "Authenticated users can view ai_analysis" ON ai_analysis

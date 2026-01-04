@@ -1,15 +1,30 @@
 import { useRouter } from 'next/router'
-import React from 'react'
+import React, { useEffect } from 'react'
 import Head from 'next/head'
 import Link from 'next/link';
 import '../styles/globals.css'
 import 'leaflet/dist/leaflet.css'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
+import { authHelpers } from '../lib/supabase'
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
   const isGovernancePage = router.pathname === '/governance';
+
+  // Check auth session on app load
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const session = await authHelpers.getSession()
+        // Session check happens automatically - auth state listeners in Header will handle UI updates
+      } catch (error) {
+        console.error('Auth check error:', error)
+      }
+    }
+
+    checkAuth()
+  }, [])
 
   React.useEffect(() => {
     // We measure heights to keep CSS variables updated for other calculations

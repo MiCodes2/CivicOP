@@ -1,14 +1,44 @@
 import { useState } from 'react';
+import { useRouter } from 'next/router';
+import { authHelpers, dbHelpers } from '../lib/supabase';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Placeholder: Implement login logic
-    console.log('Login attempt:', { email, password });
-    alert('Login functionality - Coming Soon!');
+    setError('');
+    setLoading(true);
+
+    try {
+      // Sign in with email or username
+      await authHelpers.signInWithEmailOrUsername(emailOrUsername, password);
+      
+      // Get current user details to check role
+      const user = await authHelpers.getUser();
+      if (user) {
+        // Fetch user profile from database to get role
+        const { data, error: dbError } = await dbHelpers.getUserById(user.id);
+        
+        if (dbError) throw dbError;
+        
+        // Redirect based on user role
+        if (data?.role === 'admin') {
+          router.push('/governance');
+        } else {
+          router.push('/');
+        }
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to sign in. Please check your email/username and password.');
+      console.error('Login error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -25,16 +55,16 @@ export default function Login() {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
-              <label htmlFor="email" className="sr-only">Email address</label>
+              <label htmlFor="emailOrUsername" className="sr-only">Email or Username</label>
               <input
-                id="email"
-                name="email"
-                type="email"
+                id="emailOrUsername"
+                name="emailOrUsername"
+                type="text"
                 required
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-water focus:border-water focus:z-10 sm:text-sm"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email or username (e.g., civic_admin)"
+                value={emailOrUsername}
+                onChange={(e) => setEmailOrUsername(e.target.value)}
               />
             </div>
             <div>
@@ -55,11 +85,18 @@ export default function Login() {
           <div>
             <button
               type="submit"
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-water hover:bg-water/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-water"
+              disabled={loading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-water hover:bg-water/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-water disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Sign in
+              {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </div>
+
+          {error && (
+            <div className="rounded-md bg-red-50 p-4">
+              <p className="text-sm font-medium text-red-800">{error}</p>
+            </div>
+          )}
 
           <div className="text-center">
             <a href="/register" className="text-water hover:text-water/90">

@@ -127,19 +127,18 @@ export default function Home() {
     <div className="flex-1 flex flex-col h-full" style={{ backgroundColor: 'var(--theme-bg)' }}>
       <main className="flex flex-1 overflow-hidden h-full w-full">
         <section className="flex-1 pb-0 min-h-0 h-full w-full">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full w-full px-4 py-3 md:px-4 md:py-3">
-          {/* Map Section */}
-          <div className="bg-white rounded-lg shadow-sm border flex flex-col md:col-span-2 w-full h-full min-h-0">
-            <div className="px-4 pt-4 pb-2 border-b flex-shrink-0 bg-gradient-to-r from-blue-50 to-transparent">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 h-full w-full px-3 py-3 md:px-4 md:py-3">
+          {/* Map Section - Takes full width on mobile, 2.5 cols on desktop */}
+          <div className="bg-white rounded-lg shadow-sm border flex flex-col lg:col-span-3 w-full h-full min-h-0">
+            <div className="px-4 pt-3 pb-2 border-b flex-shrink-0 bg-gradient-to-r from-blue-50 to-transparent">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900 m-0 flex items-center gap-2">
+                  <h2 className="text-base md:text-lg font-bold text-gray-900 m-0 flex items-center gap-2">
                     📍 Bengaluru City Overview
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">
-                      🟢 {incidents.length} Live
+                      🟢 {incidents.length}
                     </span>
                   </h2>
-                  <p className="text-xs text-gray-600 mt-1">Click on any issue marker to view details • Markers pulse to show severity</p>
                 </div>
               </div>
             </div>
@@ -148,16 +147,14 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Recent Incidents List */}
-          <div className="bg-white rounded-lg shadow-sm border flex flex-col md:col-span-1 w-full h-full min-h-0">
+          {/* Recent Incidents List - Hidden on mobile */}
+          <div className="hidden lg:flex bg-white rounded-lg shadow-sm border flex-col w-full h-full min-h-0">
             {/* Bengaluru Pilot Banner - Above Recent Reports */}
             <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-1.5 flex items-center justify-center gap-2 text-xs font-medium">
               <span>🧪 Bengaluru Pilot</span>
-              <span>•</span>
-              <span className="hidden sm:inline">Help improve Bengaluru</span>
             </div>
-            <div className="px-4 py-3 border-b flex-shrink-0">
-              <h3 className="text-lg font-semibold text-gray-900 m-0">Recent Reports</h3>
+            <div className="px-4 py-2 border-b flex-shrink-0">
+              <h3 className="text-sm md:text-base font-semibold text-gray-900 m-0">Recent Reports</h3>
             </div>
             <div className="flex-1 overflow-y-auto min-h-0">
               <div className="divide-y divide-gray-200">

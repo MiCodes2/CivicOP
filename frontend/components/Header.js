@@ -1,10 +1,68 @@
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useEffect, useState } from 'react'
+import { authHelpers, dbHelpers } from '../lib/supabase'
 
 export default function Header() {
   const router = useRouter()
   const isGovernance = router.pathname.startsWith('/governance')
+  const [currentUser, setCurrentUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+
+  useEffect(() => {
+    let isMounted = true
+    
+    const fetchUser = async () => {
+      try {
+        const user = await authHelpers.getUser()
+        if (isMounted) {
+          if (user) {
+            const { data } = await dbHelpers.getUserById(user.id)
+            setCurrentUser(data)
+          } else {
+            setCurrentUser(null)
+          }
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error('Error fetching user:', error)
+        if (isMounted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchUser()
+
+    // Listen for auth state changes
+    const { data: { subscription } } = authHelpers.onAuthStateChange((event, session) => {
+      if (isMounted) {
+        if (session?.user) {
+          fetchUser()
+        } else {
+          setCurrentUser(null)
+        }
+      }
+    })
+
+    return () => {
+      isMounted = false
+      subscription?.unsubscribe?.()
+    }
+  }, [])
+
+  const handleLogout = async () => {
+    try {
+      await authHelpers.signOut()
+      setCurrentUser(null)
+      setShowUserMenu(false)
+      router.push('/')
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
+  }
 
   return (
     <header className="bg-white shadow-sm border-b" style={{ height: 'var(--app-header-height)' }}>
@@ -69,7 +127,7 @@ export default function Header() {
 
           {!isGovernance && (
             <>
-              {/* Governance Hub Button */}
+              {/* Governance Hub Button - visible to everyone */}
               <Link href="/governance" className="bg-water hover:bg-water/90 text-white font-medium p-2 md:px-4 md:py-2 rounded-lg shadow-sm flex items-center gap-2 transition" title="Civic Governance Hub">
                 <svg className="w-6 h-6 md:w-5 md:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -79,13 +137,65 @@ export default function Header() {
             </>
           )}
 
-          {/* Login Button */}
-          <Link href="/login" className="bg-greenspace hover:bg-greenspace/90 text-white font-medium p-2 md:px-4 md:py-2 rounded-lg shadow-sm flex items-center gap-2 transition" title="Login">
-            <svg className="w-6 h-6 md:w-5 md:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-            </svg>
-            <span className="hidden md:inline">Login</span>
-          </Link>
+          {/* User Profile or Login Button */}
+          {!loading ? (
+            currentUser ? (
+              // User is logged in - Show profile menu
+              <div className="relative">
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition"
+                  title={`${currentUser.full_name || currentUser.email}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-water text-white rounded-full flex items-center justify-center text-sm font-bold">
+                      {(currentUser.full_name || currentUser.email)?.[0]?.toUpperCase() || 'U'}
+                    </div>
+                    <div className="hidden md:block text-left">
+                      <p className="text-sm font-medium text-gray-900">
+                        {currentUser.full_name || currentUser.email}
+                      </p>
+                      <p className="text-xs text-gray-500 capitalize">{currentUser.role}</p>
+                    </div>
+                  </div>
+                  <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
+                </button>
+
+                {/* Dropdown Menu */}
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                    <div className="px-4 py-3 border-b border-gray-200">
+                      <p className="text-sm font-medium text-gray-900">{currentUser.full_name || currentUser.email}</p>
+                      <p className="text-xs text-gray-500">{currentUser.email}</p>
+                      <p className="text-xs text-gray-400 mt-1 capitalize">Role: {currentUser.role}</p>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // User is not logged in - Show login button
+              <Link href="/login" className="bg-greenspace hover:bg-greenspace/90 text-white font-medium p-2 md:px-4 md:py-2 rounded-lg shadow-sm flex items-center gap-2 transition" title="Login">
+                <svg className="w-6 h-6 md:w-5 md:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                </svg>
+                <span className="hidden md:inline">Login</span>
+              </Link>
+            )
+          ) : (
+            // Loading state
+            <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse" />
+          )}
         </div>
         
       </div>

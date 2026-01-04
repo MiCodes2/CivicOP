@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
-import { supabase, dbHelpers } from '../lib/supabase';
+import { useRouter } from 'next/router';
+import { supabase, dbHelpers, authHelpers } from '../lib/supabase';
 
 // ----------------------------------------------------------------------
 // 1. DYNAMIC MAP LOADING
@@ -26,13 +27,75 @@ const DynamicMap = dynamic(() => import('../components/Map'), {
 // 2. MAIN LAYOUT (FULL SCREEN OVERLAY)
 // ----------------------------------------------------------------------
 export default function GovernanceDashboard() {
+  const router = useRouter();
   const [activeNav, setActiveNav] = useState('dashboard');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
   
   // Shared State
   const [filters, setFilters] = useState({
     category: 'All Categories',
     severity: 1
   });
+
+  // Check authentication on mount
+  useEffect(() => {
+    let isMounted = true
+    
+    const checkAuth = async () => {
+      try {
+        const user = await authHelpers.getUser()
+        
+        if (!user) {
+          if (isMounted) {
+            router.push('/login')
+          }
+          return
+        }
+        
+        // Fetch user profile to verify admin role
+        const { data } = await dbHelpers.getUserById(user.id)
+        
+        if (!isMounted) return
+        
+        if (!data || data.role !== 'admin') {
+          router.push('/')
+          return
+        }
+        
+        setCurrentUser(user)
+        setAuthChecked(true)
+      } catch (err) {
+        console.error('Auth check failed:', err)
+        if (isMounted) {
+          router.push('/login')
+        }
+      }
+    }
+    
+    checkAuth()
+    
+    return () => {
+      isMounted = false
+    }
+  }, [router])
+
+  // Show loading while checking auth
+  if (!authChecked) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center space-y-3">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="text-gray-600 font-medium">Verifying access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect if not authenticated
+  if (!currentUser) {
+    return null;
+  }
 
   return (
     // FIX APPLIED HERE: 
@@ -61,11 +124,11 @@ export default function GovernanceDashboard() {
             <div className="h-6 w-px bg-gray-200 mx-4"></div>
 
             {/* Top Navigation Tabs */}
-            <nav className="flex space-x-1 ml-4">
+            <nav className="flex space-x-1 ml-2 md:ml-4">
                <NavTab label="Dashboard" icon="📊" active={activeNav === 'dashboard'} onClick={() => setActiveNav('dashboard')} />
                <NavTab label="Map View" icon="🗺️" active={activeNav === 'map'} onClick={() => setActiveNav('map')} />
                <NavTab label="Workflow Triage" icon="🎫" active={activeNav === 'tickets' || activeNav === 'ai'} onClick={() => setActiveNav('tickets')} />
-               <NavTab label="Predictive & IoT" icon="📡" active={activeNav === 'iot'} onClick={() => setActiveNav('iot')} />
+               <NavTab label="IoT" icon="📡" active={activeNav === 'iot'} onClick={() => setActiveNav('iot')} />
             </nav>
 
             {/* Prominent page title placed to the right of the tabs */}
@@ -82,12 +145,20 @@ export default function GovernanceDashboard() {
             </div>
             <div className="flex items-center space-x-3 border-l pl-4 border-gray-200">
                <div className="text-right hidden sm:block">
-                  <div className="text-sm font-bold text-gray-800">Admin User</div>
-                  <div className="text-[10px] text-gray-500 uppercase">Commissioner Office</div>
+                  <div className="text-sm font-bold text-gray-800">{currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || 'Admin'}</div>
+                  <div className="text-[10px] text-gray-500 uppercase">Governance Access</div>
                </div>
-               <div className="w-9 h-9 bg-blue-100 rounded-full border border-blue-200 flex items-center justify-center text-blue-700 font-bold">
-                  AU
+               <div className="w-9 h-9 bg-blue-100 rounded-full border border-blue-200 flex items-center justify-center text-blue-700 font-bold text-xs">
+                  {currentUser?.email?.charAt(0).toUpperCase() || 'A'}
                </div>
+               <button 
+                 onClick={() => {
+                   authHelpers.signOut().then(() => router.push('/login'));
+                 }}
+                 className="ml-2 text-xs text-gray-600 hover:text-gray-900 border border-gray-200 px-2 py-1 rounded hover:bg-gray-50"
+               >
+                 Sign Out
+               </button>
             </div>
          </div>
       </header>
@@ -131,20 +202,21 @@ export default function GovernanceDashboard() {
 }
 
 // ----------------------------------------------------------------------
-// 3. NAVIGATION TAB (Top Bar)
+// 3. NAVIGATION TAB (Top Bar - Mobile: Icons Only)
 // ----------------------------------------------------------------------
 function NavTab({ label, active, onClick, icon }) {
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center space-x-2 ${
+      title={label}
+      className={`px-2 md:px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center space-x-2 ${
         active 
           ? 'bg-gray-100 text-blue-700 shadow-inner' 
           : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
       }`}
     >
-      <span>{icon}</span>
-      <span>{label}</span>
+      <span className="text-base">{icon}</span>
+      <span className="hidden md:inline">{label}</span>
     </button>
   );
 }
@@ -157,18 +229,9 @@ function DashboardView() {
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [allIncidents, setAllIncidents] = useState([]);
-  const [incidentsTableAvailable, setIncidentsTableAvailable] = useState(false);
 
   useEffect(() => {
     fetchIncidents();
-
-    // Check if the legacy 'incidents' table exists in DB (some deployments use 'civic_issues' only)
-    let mounted = true
-    import('../lib/supabase_helpers').then(({ tableExists }) => {
-      tableExists('incidents').then(v => { if (mounted) setIncidentsTableAvailable(v) })
-    })
-
-    return () => { mounted = false }
   }, []);
 
   const fetchIncidents = async () => {
@@ -220,6 +283,7 @@ function DashboardView() {
              Geospatial Intelligence Hub
           </h2>
           <div className="flex items-center space-x-3">
+            {/* Layer toggles */}
             <div className="flex space-x-2">
               {Object.keys(layerToggles).map(key => (
                 <label key={key} className={`flex items-center space-x-2 cursor-pointer px-2 py-1 rounded border transition-all select-none text-xs ${
@@ -234,11 +298,6 @@ function DashboardView() {
                    <span className="capitalize font-semibold">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
                 </label>
               ))}
-            </div>
-
-            {/* Indicate whether legacy 'incidents' table exists */}
-            <div className={`text-xs px-2 py-1 rounded border ${incidentsTableAvailable ? 'bg-green-50 text-green-700 border-green-100' : 'bg-yellow-50 text-yellow-700 border-yellow-100'}`}>
-              {incidentsTableAvailable ? 'Legacy table: incidents available' : 'Legacy table: incidents missing'}
             </div>
           </div>
         </div>
@@ -336,17 +395,8 @@ function KanbanView({ filters, setFilters }) {
       }
 
       if (!Array.isArray(sample) || sample.length === 0) {
-        // Check if incidents table exists before trying
-        const { tableExists } = await import('../lib/supabase_helpers')
-        const incidentsExists = await tableExists('incidents')
-        if (incidentsExists) {
-          query = supabase
-            .from('incidents')
-            .select('*')
-            .order('created_at', { ascending: false });
-        } else {
-          // nothing to do — both are empty or missing
-        }
+        // If civic_issues is empty, no fallback - use civic_issues only
+        // Legacy 'incidents' table is deprecated
       }
 
       if (filters.category && filters.category !== 'All Categories') {
@@ -373,25 +423,34 @@ function KanbanView({ filters, setFilters }) {
     setIncidents(prev => prev.map(i => i.id === id ? { ...i, status: newStatus } : i));
 
     try {
+      // Check user is authenticated
+      if (!currentUser) {
+        throw new Error('Not authenticated. Please sign in first.');
+      }
+
       // Use dbHelpers.updateIncident which tries both tables and throws if both fail
       const updated = await dbHelpers.updateIncident(String(id), { status: newStatus });
 
       // Validate the response - Supabase returns an array of updated rows
       if (!updated || (Array.isArray(updated) && updated.length === 0)) {
-        throw new Error('No rows were updated on the server')
+        throw new Error('No rows were updated. Check database permissions.');
       }
 
-      // Refresh canonical server state
-      await fetchIncidents();
-      setMessage(`Status updated to ${newStatus}`);
-      setTimeout(() => setMessage(null), 3000);
+      // Show success message
+      setMessage(`✓ Moved to ${newStatus}`);
+      setTimeout(() => setMessage(null), 2000);
+      
+      // Refresh data in background without blocking
+      fetchIncidents().catch(err => console.error('Refresh after update failed:', err));
+      
       return true;
     } catch (err) {
       console.error('Failed to update status:', err);
       // Revert optimistic update
       setIncidents(prevIncidents);
-      setMessage(`Failed to update status: ${err.message || err}`);
-      setTimeout(() => setMessage(null), 4000);
+      const errorMsg = err.message || 'Update failed';
+      setMessage(`✗ ${errorMsg}`);
+      setTimeout(() => setMessage(null), 3500);
       return false;
     }
   };
@@ -758,142 +817,26 @@ function KanbanCard({ id, title, severity, location, createdAt, status, incident
 }
 
 // ----------------------------------------------------------------------
-// 7. IoT & ANALYTICS VIEW (Includes Gauge)
+// 7. IoT & ANALYTICS VIEW - Coming Soon
 // ----------------------------------------------------------------------
 function IoTView() {
-  const [timeHorizon, setTimeHorizon] = useState('forecast');
-
   return (
-    <div className="h-full overflow-y-auto p-1 space-y-4">
-      {/* Time Horizon Selector */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-           <span className="font-bold text-gray-700 text-sm flex items-center">
-             <svg className="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-             PREDICTIVE HORIZON:
-           </span>
-           <div className="flex bg-gray-100 p-1 rounded-lg">
-              <button onClick={() => setTimeHorizon('past')} className={`px-3 py-1 text-xs rounded font-medium transition-all ${timeHorizon === 'past' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>Past 24h</button>
-              <button onClick={() => setTimeHorizon('forecast')} className={`px-3 py-1 text-xs rounded font-medium transition-all ${timeHorizon === 'forecast' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>Next 48h</button>
-           </div>
+    <div className="h-full flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg border border-gray-200 shadow-lg p-8 text-center max-w-md">
+        <div className="text-5xl mb-4">📡</div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-3">Predictive & IoT</h2>
+        <p className="text-gray-600 mb-6">Real-time sensor integration and predictive analytics platform coming soon.</p>
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+          <span className="animate-pulse">●</span>
+          Coming Soon
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        
-        {/* A. Predictive Model */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex flex-col">
-           <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-2 mb-4">Predictive Infra Failure Model</h2>
-           <div className="relative h-48 bg-gray-50 rounded-lg p-4 border border-dashed border-gray-200 flex items-end justify-around group">
-               {/* Bar Chart Viz */}
-               <div className="flex flex-col items-center w-full">
-                  <div className="w-12 bg-red-400 rounded-t h-[80%] relative hover:bg-red-500 transition-colors shadow-sm">
-                     <div className="absolute -top-5 w-full text-center text-[10px] font-bold text-red-600">85%</div>
-                  </div>
-                  <div className="text-[10px] font-bold text-gray-600 mt-1">Today</div>
-               </div>
-               <div className="flex flex-col items-center w-full">
-                  <div className="w-12 bg-yellow-400 rounded-t h-[60%] hover:bg-yellow-500 transition-colors shadow-sm">
-                     <div className="absolute -top-5 w-full text-center text-[10px] font-bold text-yellow-600">60%</div>
-                  </div>
-                  <div className="text-[10px] font-bold text-gray-600 mt-1">Tomorrow</div>
-               </div>
-               <div className="flex flex-col items-center w-full">
-                  <div className="w-12 bg-green-400 rounded-t h-[30%] hover:bg-green-500 transition-colors shadow-sm">
-                     <div className="absolute -top-5 w-full text-center text-[10px] font-bold text-green-600">30%</div>
-                  </div>
-                  <div className="text-[10px] font-bold text-gray-600 mt-1">Friday</div>
-               </div>
-           </div>
-           
-           <div className="mt-3 bg-red-50 border border-red-100 p-3 rounded flex items-start space-x-2">
-              <span className="text-lg">⚠️</span>
-              <div>
-                 <div className="text-xs font-bold text-red-800">ALERT: Zone D Risk Critical</div>
-                 <div className="text-[10px] text-red-600 mt-0.5">85% probability of road failure due to heavy rain.</div>
-              </div>
-           </div>
-        </div>
-
-        {/* B. Sensor Grid */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex flex-col">
-           <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-2 mb-4">Real-Time Sensor Grid</h2>
-           <div className="space-y-3 flex-1">
-              <SensorRow name="Water Level (Drain 44-A)" time="1m ago" status="NORMAL" color="green" icon="💧" />
-              <SensorRow name="Water Level (Drain 44-B)" time="30s ago" status="RISING" color="yellow" icon="💧" isPulse />
-              <SensorRow name="Air Quality (Junction X)" time="Live" status="POOR (210)" color="red" icon="💨" />
-           </div>
-        </div>
-
-        {/* C. GAUGE CHART (Restored) */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 lg:col-span-2">
-           <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-2 mb-4 flex justify-between">
-             <span>Civic Performance Index (SLA)</span>
-             <span className="text-[10px] font-normal text-gray-500">Weekly Aggregate</span>
-           </h2>
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center px-4">
-              {/* Gauge */}
-              <div className="flex flex-col items-center justify-center">
-                 <div className="relative w-32 h-32">
-                   <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                     <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#f3f4f6" strokeWidth="3" />
-                     <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#fbbf24" strokeWidth="3" strokeDasharray="72, 100" />
-                   </svg>
-                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-2xl font-black text-gray-800">72%</span>
-                      <span className="text-[10px] font-medium text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full">Fair</span>
-                   </div>
-                 </div>
-                 <div className="w-full flex justify-between text-[10px] text-gray-400 mt-2 px-6">
-                    <span>Poor</span>
-                    <span>Good</span>
-                 </div>
-              </div>
-              
-              {/* Metrics */}
-              <div className="space-y-3">
-                 <MetricRow label="Avg Resolution Time" value="2.4 Days" sub="↓ 15%" color="green" />
-                 <MetricRow label="AI Automation Rate" value="72% of tickets" color="blue" />
-                 <MetricRow label="Worst Performing Ward" value="Ward 12 (Lagging)" color="red" />
-              </div>
-           </div>
-        </div>
-
       </div>
     </div>
   );
 }
 
-function SensorRow({ name, time, status, color, icon, isPulse }) {
-    const bg = color === 'green' ? 'bg-green-100 text-green-700' : color === 'yellow' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700';
-    return (
-        <div className="border border-gray-100 rounded p-2.5 flex justify-between items-center bg-gray-50 hover:bg-white transition-colors">
-            <div className="flex items-center space-x-3">
-            <div className={`p-1.5 rounded bg-gray-200 text-gray-600`}>{icon}</div>
-            <div>
-                <div className="font-semibold text-gray-800 text-xs">{name}</div>
-                <div className="text-[10px] text-gray-500">{time}</div>
-            </div>
-            </div>
-            <span className={`${bg} text-[10px] px-2 py-0.5 rounded font-bold border border-opacity-20 ${isPulse ? 'animate-pulse' : ''}`}>{status}</span>
-        </div>
-    )
-}
-
-function MetricRow({ label, value, sub, color }) {
-    const textColor = color === 'green' ? 'text-green-600' : color === 'blue' ? 'text-blue-600' : 'text-red-600';
-    return (
-        <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-            <span className="text-xs font-medium text-gray-600">{label}</span>
-            <span className={`text-xs font-bold ${textColor} flex items-center`}>
-                {value} {sub && <span className="text-[10px] ml-1 bg-gray-200 px-1 rounded text-gray-600">{sub}</span>}
-            </span>
-        </div>
-    )
-}
-
-// 8. MAP VIEW WRAPPER
-// ----------------------------------------------------------------------
+// 8. MAP VIEW
+// -----------------------------------------------------------------------
 function MapView() {
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -904,36 +847,19 @@ function MapView() {
 
   const fetchIncidents = async () => {
     try {
-      let { data, error } = await supabase
+      const { data, error } = await supabase
         .from('civic_issues')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
-
+      
       if (error) throw error;
-
-      // Fallback to 'incidents' table if civic_issues is empty
-      if (!(Array.isArray(data) && data.length > 0)) {
-        const { tableExists } = await import('../lib/supabase_helpers')
-        const incidentsExists = await tableExists('incidents')
-        if (incidentsExists) {
-          const res2 = await supabase
-            .from('incidents')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(100);
-          data = (res2 && res2.data) || data;
-        } else {
-          console.debug('MapView: no civic_issues rows and incidents table missing')
-        }
-      }
 
       const normalized = (Array.isArray(data) ? data : []).map(d => ({
         ...d,
         latitude: d.latitude != null ? parseFloat(d.latitude) : null,
         longitude: d.longitude != null ? parseFloat(d.longitude) : null,
       }));
-      console.debug('MapView fetched incidents:', normalized.length);
       setIncidents(normalized);
     } catch (err) {
       console.error('Error fetching incidents:', err);
@@ -945,20 +871,16 @@ function MapView() {
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden h-full flex flex-col">
        <div className="p-3 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-          <h2 className="font-semibold text-gray-800 text-sm">Full Intelligence Map</h2>
-          <button className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 shadow-sm">Export GIS Data</button>
+          <h2 className="font-semibold text-gray-800 text-sm">Geospatial Intelligence Map</h2>
+          <button className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 shadow-sm">Export GIS</button>
        </div>
-       <div className="flex-1 bg-gray-50 relative min-h-0 flex items-center justify-center">
+       <div className="flex-1 bg-gray-50 relative min-h-0">
           {loading ? (
-            <div className="text-gray-500 text-sm">Loading map data...</div>
-          ) : incidents.length === 0 ? (
-            <div className="text-gray-500 text-sm">No incidents with valid coordinates to display on map.</div>
+            <div className="flex items-center justify-center h-full text-gray-500 text-sm">Loading map...</div>
           ) : (
-            <div className="absolute inset-0">
-              <DynamicMap incidents={incidents} userLocation={null} fillHeight />
-            </div>
+            <DynamicMap incidents={incidents} userLocation={null} fillHeight zoom={14} />
           )}
        </div>
     </div>
-  )
+  );
 }
