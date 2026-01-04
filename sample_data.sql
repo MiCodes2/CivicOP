@@ -94,6 +94,17 @@ VALUES
     '753 Flood Street, Bengaluru',
     'Ward 8',
     'IN_PROGRESS'
+  ),
+  (
+    'Repaired Traffic Signal',
+    'Traffic signal at busy junction fixed and fully operational.',
+    12.9628,
+    77.5875,
+    2,
+    'Traffic',
+    '100 Signal Road, Bengaluru',
+    'Ward 9',
+    'RESOLVED'
   );
 
 -- Verify insertion

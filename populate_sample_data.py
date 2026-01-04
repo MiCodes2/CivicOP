@@ -92,6 +92,17 @@ issues = [
         "ward_number": "Ward 6",
         "status": "OPEN"
     },
+    {
+        "title": "Repaired Traffic Signal",
+        "description": "Traffic signal at busy junction fixed and fully operational.",
+        "latitude": 12.9628,
+        "longitude": 77.5875,
+        "severity": 2,
+        "category": "Traffic",
+        "address": "100 Signal Road, Bengaluru",
+        "ward_number": "Ward 9",
+        "status": "RESOLVED"
+    },
 ]
 
 print("🚀 Adding sample civic issues to Supabase...\n")

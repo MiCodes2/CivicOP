@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabase';
 
 // Dynamically import map to avoid SSR issues
@@ -18,11 +19,34 @@ const ReportIssueForm = dynamic(() => import('../components/ReportIssueForm'), {
 import CameraOverlay from '../components/CameraOverlay';
 
 export default function Home() {
+  const router = useRouter();
   const [incidents, setIncidents] = useState([]);
   const [showCamera, setShowCamera] = useState(false);
   const [showReportForm, setShowReportForm] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
   const [activeTab, setActiveTab] = useState('recent'); // recent, stats, info
+
+  // Check for report query param (from external link or /citizens-issue redirect)
+  // This handles: https://app.civicopindia.com/?report=true
+  useEffect(() => {
+    // Check URL params on initial load (works even before router is ready)
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('report') === 'true') {
+        setShowReportForm(true);
+        // Clean up the URL without triggering a page reload
+        window.history.replaceState({}, '', '/');
+      }
+    }
+  }, []);
+
+  // Also check router query (for client-side navigation)
+  useEffect(() => {
+    if (router.isReady && router.query.report === 'true') {
+      setShowReportForm(true);
+      router.replace('/', undefined, { shallow: true });
+    }
+  }, [router.isReady, router.query.report]);
 
   // Fetch incidents from Supabase
   useEffect(() => {
@@ -37,10 +61,15 @@ export default function Home() {
         table: 'civic_issues' 
       }, (payload) => {
         console.log('Real-time update (civic_issues):', payload);
+        const parseIncident = (inc) => ({
+          ...inc,
+          latitude: inc.latitude != null ? parseFloat(inc.latitude) : null,
+          longitude: inc.longitude != null ? parseFloat(inc.longitude) : null,
+        });
         if (payload.eventType === 'INSERT') {
-          setIncidents(prev => [payload.new, ...prev]);
+          setIncidents(prev => [parseIncident(payload.new), ...prev]);
         } else if (payload.eventType === 'UPDATE') {
-          setIncidents(prev => prev.map(inc => inc.id === payload.new.id ? payload.new : inc));
+          setIncidents(prev => prev.map(inc => inc.id === payload.new.id ? parseIncident(payload.new) : inc));
         } else if (payload.eventType === 'DELETE') {
           setIncidents(prev => prev.filter(inc => inc.id !== payload.old.id));
         }
@@ -90,7 +119,13 @@ export default function Home() {
       }
       
       console.log('Fetched incidents:', data?.length, 'at', new Date().toISOString());
-      setIncidents(data || []);
+      // Parse lat/lng as floats to ensure proper filtering in Map component
+      const parsedData = (data || []).map(d => ({
+        ...d,
+        latitude: d.latitude != null ? parseFloat(d.latitude) : null,
+        longitude: d.longitude != null ? parseFloat(d.longitude) : null,
+      }));
+      setIncidents(parsedData);
     } catch (error) {
       console.error('Error fetching incidents:', error);
       setIncidents([]);

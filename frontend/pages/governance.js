@@ -389,8 +389,8 @@ function DashboardView({ incidents = [], loading = false }) {
         </div>
       </div>
 
-      {/* ADMIN INSIGHTS PANEL (Fixed Width 380px) */}
-      <div className="w-[380px] flex flex-col gap-3 shrink-0 overflow-y-auto">
+      {/* ADMIN INSIGHTS PANEL (Fixed Width 380px) - Hidden on mobile to prevent blocking map view */}
+      <div className="hidden lg:flex w-[380px] flex-col gap-3 shrink-0 overflow-y-auto">
         {/* Quick Stats Grid */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3">
           <h3 className="font-semibold text-gray-800 text-sm mb-3 flex items-center gap-2">
