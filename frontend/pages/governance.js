@@ -1043,26 +1043,26 @@ function MapView({ incidents = [] }) {
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden h-full flex flex-col">
        {/* Admin Control Bar */}
        <div className="p-3 border-b border-gray-200 bg-gradient-to-r from-slate-800 to-slate-700">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between lg:mb-3">
             <div className="flex items-center gap-3">
               <h2 className="font-bold text-white text-sm flex items-center gap-2">
                 🗺️ Command Center Map
               </h2>
               <span className="text-[10px] bg-purple-500 text-white px-2 py-0.5 rounded font-bold">ADMIN ONLY</span>
-              <span className="text-[10px] bg-green-500 text-white px-2 py-0.5 rounded font-bold flex items-center gap-1">
+              <span className="hidden lg:flex text-[10px] bg-green-500 text-white px-2 py-0.5 rounded font-bold items-center gap-1">
                 <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
                 LIVE
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="hidden lg:flex items-center gap-2">
               <span className="text-[10px] text-gray-300">Showing {filteredIncidents.length} of {incidents.length}</span>
               <button className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 shadow-sm font-medium">📥 Export GIS</button>
               <button className="text-xs bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 shadow-sm font-medium">📊 Report</button>
             </div>
           </div>
           
-          {/* Filter Controls */}
-          <div className="flex flex-wrap items-center gap-3">
+          {/* Filter Controls - Hidden on mobile */}
+          <div className="hidden lg:flex flex-wrap items-center gap-3">
             {/* Status Filter */}
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-gray-400 font-medium">STATUS:</span>
@@ -1107,10 +1107,10 @@ function MapView({ incidents = [] }) {
             <div className="flex items-center justify-center h-full text-gray-500 text-sm">Loading map data...</div>
           ) : (
             <DynamicMap incidents={filteredIncidents} userLocation={null} fillHeight />
-          )}
+          )}}
           
-          {/* Admin Stats Panel - Left */}
-          <div className="absolute top-4 left-4 bg-slate-800/95 backdrop-blur rounded-lg shadow-lg border border-slate-700 p-3 min-w-[200px] z-40">
+          {/* Admin Stats Panel - Left - Hidden on mobile */}
+          <div className="hidden lg:block absolute top-4 left-4 bg-slate-800/95 backdrop-blur rounded-lg shadow-lg border border-slate-700 p-3 min-w-[200px] z-40">
             <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 flex items-center justify-between">
               <span>📊 Live Statistics</span>
               <span className="text-green-400">● Online</span>
@@ -1156,8 +1156,8 @@ function MapView({ incidents = [] }) {
             </div>
           </div>
           
-          {/* Ward Hotspots - Top Right */}
-          <div className="absolute top-4 right-4 bg-slate-800/95 backdrop-blur rounded-lg shadow-lg border border-slate-700 p-3 min-w-[180px] z-40">
+          {/* Ward Hotspots - Top Right - Hidden on mobile */}
+          <div className="hidden lg:block absolute top-4 right-4 bg-slate-800/95 backdrop-blur rounded-lg shadow-lg border border-slate-700 p-3 min-w-[180px] z-40">
             <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2">🎯 Hotspot Wards</div>
             <div className="space-y-2">
               {topWards.map(([ward, count], idx) => (
@@ -1172,8 +1172,8 @@ function MapView({ incidents = [] }) {
             </div>
           </div>
           
-          {/* Category Distribution - Bottom Right */}
-          <div className="absolute bottom-4 right-4 bg-slate-800/95 backdrop-blur rounded-lg shadow-lg border border-slate-700 p-3 min-w-[200px] z-40">
+          {/* Category Distribution - Bottom Right - Hidden on mobile */}
+          <div className="hidden lg:block absolute bottom-4 right-4 bg-slate-800/95 backdrop-blur rounded-lg shadow-lg border border-slate-700 p-3 min-w-[200px] z-40">
             <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2">🏷️ By Category</div>
             <div className="space-y-1.5">
               {topCategories.map(([cat, count]) => (
@@ -1192,8 +1192,8 @@ function MapView({ incidents = [] }) {
             </div>
           </div>
           
-          {/* Admin Actions Panel - Bottom Left */}
-          <div className="absolute bottom-4 left-4 flex items-center gap-2 z-40">
+          {/* Admin Actions Panel - Bottom Left - Hidden on mobile */}
+          <div className="hidden lg:flex absolute bottom-4 left-4 items-center gap-2 z-40">
             <div className="bg-green-600/95 backdrop-blur rounded-lg shadow-sm border border-green-500 p-2 px-3 flex items-center space-x-2">
               <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
               <div className="text-xs font-bold text-white">LIVE SYNC</div>
