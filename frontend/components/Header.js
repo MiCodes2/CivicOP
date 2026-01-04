@@ -1,8 +1,8 @@
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useEffect, useState } from 'react'
-import { authHelpers, dbHelpers } from '../lib/supabase'
+import { useEffect, useState, useRef, useCallback } from 'react'
+import { authHelpers, dbHelpers, supabase } from '../lib/supabase'
 
 export default function Header() {
   const router = useRouter()
@@ -10,6 +10,15 @@ export default function Header() {
   const [currentUser, setCurrentUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [showSearchResults, setShowSearchResults] = useState(false)
+  const [showMobileSearch, setShowMobileSearch] = useState(false)
+  const searchRef = useRef(null)
+  const mobileSearchRef = useRef(null)
 
   useEffect(() => {
     let isMounted = true
