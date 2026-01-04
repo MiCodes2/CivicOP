@@ -47,22 +47,35 @@ export default function GovernanceDashboard() {
         const user = await authHelpers.getUser()
         
         if (!user) {
+          console.log('No user found, redirecting to login')
           if (isMounted) {
             router.push('/login')
           }
           return
         }
         
+        console.log('User authenticated:', user.id)
+        
         // Fetch user profile to verify admin role
-        const { data } = await dbHelpers.getUserById(user.id)
+        const { data, error } = await dbHelpers.getUserById(user.id)
         
         if (!isMounted) return
         
+        if (error) {
+          console.error('Error fetching user profile:', error)
+          router.push('/login')
+          return
+        }
+        
+        console.log('User profile:', data)
+        
         if (!data || data.role !== 'admin') {
+          console.log('User is not admin, redirecting to home')
           router.push('/')
           return
         }
         
+        console.log('Admin user verified, showing governance page')
         setCurrentUser(user)
         setAuthChecked(true)
       } catch (err) {

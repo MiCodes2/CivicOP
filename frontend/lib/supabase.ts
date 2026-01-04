@@ -50,8 +50,7 @@ export const dbHelpers = {
       .select('*')
       .eq('id', id)
       .single()
-    if (error) throw error
-    return data
+    return { data, error }
   },
 
   // Incidents (prefer 'civic_issues' if available, else fallback to 'incidents')

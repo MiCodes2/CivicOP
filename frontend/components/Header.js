@@ -19,8 +19,10 @@ export default function Header() {
         const user = await authHelpers.getUser()
         if (isMounted) {
           if (user) {
-            const { data } = await dbHelpers.getUserById(user.id)
-            setCurrentUser(data)
+            const { data, error } = await dbHelpers.getUserById(user.id)
+            if (!error && data) {
+              setCurrentUser(data)
+            }
           } else {
             setCurrentUser(null)
           }
@@ -38,6 +40,7 @@ export default function Header() {
 
     // Listen for auth state changes
     const { data: { subscription } } = authHelpers.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event, session?.user?.id)
       if (isMounted) {
         if (session?.user) {
           fetchUser()
