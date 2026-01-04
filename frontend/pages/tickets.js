@@ -1,13 +1,34 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabase';
 
 export default function Tickets() {
+  const router = useRouter();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [highlightedId, setHighlightedId] = useState(null);
+  const highlightedRef = useRef(null);
+
+  // Handle highlight query parameter from search
+  useEffect(() => {
+    if (router.query.highlight) {
+      setHighlightedId(router.query.highlight);
+      // Clear highlight after 5 seconds
+      const timer = setTimeout(() => setHighlightedId(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [router.query.highlight]);
+
+  // Scroll to highlighted ticket
+  useEffect(() => {
+    if (highlightedId && highlightedRef.current && !loading) {
+      highlightedRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [highlightedId, loading]);
 
   useEffect(() => {
     fetchTickets();
@@ -198,8 +219,13 @@ export default function Tickets() {
             {filteredTickets.map(ticket => {
               const status = (ticket.status || 'OPEN').toUpperCase();
               const severity = ticket.severity || 3;
+              const isHighlighted = ticket.id === highlightedId;
               return (
-                <div key={ticket.id} className="bg-white rounded-xl border shadow-sm hover:shadow-md transition overflow-hidden">
+                <div 
+                  key={ticket.id} 
+                  ref={isHighlighted ? highlightedRef : null}
+                  className={`bg-white rounded-xl border shadow-sm hover:shadow-md transition overflow-hidden ${isHighlighted ? 'ring-2 ring-blue-500 ring-offset-2 animate-pulse' : ''}`}
+                >
                   {ticket.image_url && (
                     <div className="h-32 bg-gray-100 relative">
                       <img src={ticket.image_url} alt={ticket.category} className="w-full h-full object-cover" />
