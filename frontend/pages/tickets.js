@@ -39,7 +39,7 @@ export default function Tickets() {
         if (payload.eventType === 'INSERT') {
           setTickets(prev => [payload.new, ...prev]);
         } else if (payload.eventType === 'UPDATE') {
-          setTickets(prev => prev.map(t => t.id === payload.new.id ? payload.new : t));
+          setTickets(prev => prev.map(t => String(t.id) === String(payload.new.id) ? payload.new : t));
         } else if (payload.eventType === 'DELETE') {
           setTickets(prev => prev.filter(t => t.id !== payload.old.id));
         }

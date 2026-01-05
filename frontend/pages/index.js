@@ -69,9 +69,11 @@ export default function Home() {
         if (payload.eventType === 'INSERT') {
           setIncidents(prev => [parseIncident(payload.new), ...prev]);
         } else if (payload.eventType === 'UPDATE') {
-          setIncidents(prev => prev.map(inc => inc.id === payload.new.id ? parseIncident(payload.new) : inc));
+          // Normalize payload and compare IDs as strings to avoid type mismatch between number/string
+          const updated = parseIncident(payload.new);
+          setIncidents(prev => prev.map(inc => String(inc.id) === String(updated.id) ? updated : inc));
         } else if (payload.eventType === 'DELETE') {
-          setIncidents(prev => prev.filter(inc => inc.id !== payload.old.id));
+          setIncidents(prev => prev.filter(inc => String(inc.id) !== String(payload.old.id)));
         }
       })
       .subscribe();

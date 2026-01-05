@@ -17,7 +17,8 @@ export default function Dashboard() {
         if (payload.eventType === 'INSERT') {
           setIncidents(prev => [payload.new, ...prev]);
         } else if (payload.eventType === 'UPDATE') {
-          setIncidents(prev => prev.map(inc => inc.id === payload.new.id ? payload.new : inc));
+          // Ensure ID comparison is robust to string/number types
+          setIncidents(prev => prev.map(inc => String(inc.id) === String(payload.new.id) ? payload.new : inc));
         } else if (payload.eventType === 'DELETE') {
           setIncidents(prev => prev.filter(inc => inc.id !== payload.old.id));
         }

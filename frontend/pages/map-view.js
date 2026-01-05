@@ -18,12 +18,14 @@ export default function MapView() {
     const subscription = supabase
       .channel('civic_issues_mapview')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'civic_issues' }, (payload) => {
+        const normalize = (row) => ({ ...row, latitude: row.latitude != null ? parseFloat(row.latitude) : null, longitude: row.longitude != null ? parseFloat(row.longitude) : null });
         if (payload.eventType === 'INSERT') {
-          setIncidents(prev => [payload.new, ...prev]);
+          setIncidents(prev => [normalize(payload.new), ...prev]);
         } else if (payload.eventType === 'UPDATE') {
-          setIncidents(prev => prev.map(inc => inc.id === payload.new.id ? payload.new : inc));
+          const updated = normalize(payload.new);
+          setIncidents(prev => prev.map(inc => String(inc.id) === String(updated.id) ? updated : inc));
         } else if (payload.eventType === 'DELETE') {
-          setIncidents(prev => prev.filter(inc => inc.id !== payload.old.id));
+          setIncidents(prev => prev.filter(inc => String(inc.id) !== String(payload.old.id)));
         }
       })
       .subscribe();
@@ -41,7 +43,12 @@ export default function MapView() {
         .limit(100);
 
       if (error) throw error;
-      setIncidents(data || []);
+      const parsed = (Array.isArray(data) ? data : []).map(d => ({
+        ...d,
+        latitude: d.latitude != null ? parseFloat(d.latitude) : null,
+        longitude: d.longitude != null ? parseFloat(d.longitude) : null,
+      }));
+      setIncidents(parsed);
     } catch (error) {
       console.error('Error fetching incidents:', error);
     } finally {
@@ -60,12 +67,48 @@ export default function MapView() {
     }
   }, []);
 
+  // Helper to set coordinates/address for an incident (useful for unmapped resolved items)
+  const setIncidentCoords = async (id, lat, lng, addr) => {
+    // Optimistically update local state so popups and markers reflect change immediately
+    setIncidents(prev => prev.map(i => (String(i.id) === String(id) ? { ...i, latitude: parseFloat(lat), longitude: parseFloat(lng), address: addr } : i)));
+
+    try {
+      const { data, error } = await supabase
+        .from('civic_issues')
+        .update({ latitude: lat, longitude: lng, address: addr })
+        .eq('id', id)
+        .select();
+
+      if (error) {
+        throw error;
+      }
+
+      // Ensure canonical server state
+      await fetchIncidents();
+
+      // Minor UX: notify user
+      window.alert(`Updated incident ${id} to ${addr} (${lat}, ${lng})`);
+    } catch (err) {
+      console.error('Failed to set coords:', err);
+      // Re-sync with server to revert optimistic change
+      await fetchIncidents();
+      window.alert('Failed to update incident: ' + (err.message || err));
+    }
+  };
+
+
   const stats = useMemo(() => {
     const openCount = incidents.filter(i => (i.status || 'OPEN').toUpperCase() === 'OPEN').length;
     const inProgressCount = incidents.filter(i => (i.status || '').toUpperCase() === 'IN_PROGRESS').length;
-    const resolvedCount = incidents.filter(i => ['RESOLVED', 'CLOSED'].includes((i.status || '').toUpperCase())).length;
+    const allResolved = incidents.filter(i => ['RESOLVED', 'CLOSED'].includes((i.status || '').toUpperCase()));
+    const resolvedCount = allResolved.length;
+    const resolvedWithCoords = allResolved.filter(i => Number.isFinite(i.latitude) && Number.isFinite(i.longitude));
+    const resolvedWithCoordsCount = resolvedWithCoords.length;
+    const resolvedWithoutCoords = allResolved.filter(i => !(Number.isFinite(i.latitude) && Number.isFinite(i.longitude)));
+    const resolvedWithoutCoordsCount = resolvedWithoutCoords.length;
+    const unresolvedResolvedList = resolvedWithoutCoords.map(i => ({ id: i.id, title: i.title }));
     const criticalCount = incidents.filter(i => i.severity >= 4).length;
-    return { openCount, inProgressCount, resolvedCount, criticalCount };
+    return { openCount, inProgressCount, resolvedCount, resolvedWithCoordsCount, resolvedWithoutCoordsCount, unresolvedResolvedList, criticalCount };
   }, [incidents]);
 
   const filteredIncidents = useMemo(() => {
@@ -166,14 +209,35 @@ export default function MapView() {
                 <div className="text-[9px] text-blue-700">Progress</div>
               </div>
               <div className="text-center p-2 bg-green-50 rounded-lg">
-                <div className="text-sm font-bold text-green-600">{stats.resolvedCount}</div>
-                <div className="text-[9px] text-green-700">Resolved</div>
+                <div className="text-sm font-bold text-green-600">{stats.resolvedWithCoordsCount}</div>
+                <div className="text-[9px] text-green-700">Resolved on map</div>
+                {stats.resolvedWithoutCoordsCount > 0 && (
+                  <div className="text-[10px] text-gray-500 mt-1">+{stats.resolvedWithoutCoordsCount} resolved (no coords)</div>
+                )}
               </div>
             </div>
             {stats.criticalCount > 0 && (
               <div className="flex items-center justify-between p-2 bg-red-50 rounded-lg">
                 <span className="text-xs text-red-700">⚠️ Critical Issues</span>
                 <span className="text-sm font-bold text-red-600">{stats.criticalCount}</span>
+              </div>
+            )}
+
+            {/* Unmapped resolved items diagnostics */}
+            {stats.resolvedWithoutCoordsCount > 0 && (
+              <div className="mt-2 p-2 bg-yellow-50 rounded-lg border border-yellow-100 text-xs text-gray-700">
+                <div className="font-semibold mb-1">Unmapped resolved issues: {stats.resolvedWithoutCoordsCount}</div>
+                <div className="space-y-1">
+                  {stats.unresolvedResolvedList.map(it => (
+                    <div key={it.id} className="flex items-center justify-between">
+                      <div className="truncate mr-3">#{it.id} — {it.title || 'Untitled'}</div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => setIncidentCoords(it.id, 12.97, 77.59, 'Tonique, MG Road, Bengaluru')} className="text-xs text-blue-600 hover:underline">Set to Tonique</button>
+                        <button onClick={() => { navigator.clipboard?.writeText(String(it.id)); }} className="text-xs text-gray-400">Copy ID</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
