@@ -259,7 +259,7 @@ export default function IssueDetailModal({ issue, onClose, onUpdate, currentUser
               <label className="text-sm font-semibold text-gray-700 mb-3 block">Update Status</label>
               {!issue.assigned_to && (
                 <div className="mb-3 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
-                  ⚠️ <strong>Assignment Required:</strong> This issue must be assigned to someone before moving to "In Progress" or "Resolved" status.
+                  ⚠️ <strong>Assignment Required:</strong> This issue must be assigned to someone before moving to &quot;In Progress&quot; or &quot;Resolved&quot; status.
                 </div>
               )}
               <div className="flex flex-wrap gap-2">
@@ -353,7 +353,7 @@ export default function IssueDetailModal({ issue, onClose, onUpdate, currentUser
                         </p>
                       )}
                       {assignment.notes && (
-                        <p className="text-gray-700 mt-1 italic">"{assignment.notes}"</p>
+                        <p className="text-gray-700 mt-1 italic">&quot;{assignment.notes}&quot;</p>
                       )}
                       <p className="text-gray-500 mt-1">
                         {new Date(assignment.created_at).toLocaleString('en-IN')}
