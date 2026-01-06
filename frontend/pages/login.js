@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import { authHelpers, dbHelpers } from '../lib/supabase';
 
 export default function Login() {
@@ -99,9 +100,9 @@ export default function Login() {
           )}
 
           <div className="text-center">
-            <a href="/register" className="text-water hover:text-water/90">
-              Don't have an account? Sign up
-            </a>
+            <Link href="/register" className="text-water hover:text-water/90">
+              Don&apos;t have an account? Sign up
+            </Link>
           </div>
         </form>
       </div>

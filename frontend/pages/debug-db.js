@@ -66,17 +66,17 @@ export default function DebugDB() {
           </table>
         </div>
         {incidents.length === 0 && !loading && (
-          <p className="text-gray-500 text-sm">Click "Query Database" to see results</p>
+          <p className="text-gray-500 text-sm">Click &quot;Query Database&quot; to see results</p>
         )}
       </div>
 
       <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded text-sm">
         <p className="font-bold mb-2">🔧 Instructions:</p>
         <ol className="list-decimal list-inside space-y-1">
-          <li>Click "Query Database" to fetch all incidents with their addresses</li>
+          <li>Click &quot;Query Database&quot; to fetch all incidents with their addresses</li>
           <li>Look for resolved incidents and check if their addresses match what you saw in the UI</li>
           <li>If addresses are different in the DB vs. UI, the update never persisted</li>
-          <li>If addresses match the old values, the "Set to Tonique" update didn't save</li>
+          <li>If addresses match the old values, the &quot;Set to Tonique&quot; update didn&apos;t save</li>
           <li>If addresses are fresh, then the issue is purely a frontend caching problem</li>
         </ol>
       </div>

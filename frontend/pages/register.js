@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Link from 'next/link';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -122,9 +123,9 @@ export default function Register() {
           </div>
 
           <div className="text-center">
-            <a href="/login" className="text-water hover:text-water/90">
+            <Link href="/login" className="text-water hover:text-water/90">
               Already have an account? Sign in
-            </a>
+            </Link>
           </div>
         </form>
       </div>

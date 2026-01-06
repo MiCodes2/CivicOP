@@ -946,7 +946,7 @@ function DashboardView({ incidents = [], loading = false, emergencyMode, setEmer
             </div>
           </div>
           <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
-            <span className="text-gray-500">Today's Reports:</span>
+            <span className="text-gray-500">Today&apos;s Reports:</span>
             <span className="font-bold text-gray-800">{todayCount}</span>
           </div>
           <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between text-xs bg-gray-50 -mx-3 px-3 py-2 rounded-b-lg">
