@@ -123,7 +123,7 @@ const DuplicateDetectionPanel = ({ incident, onDuplicateFound }) => {
 
       <div className="mt-3 p-3 bg-amber-100 rounded border border-amber-200">
         <p className="text-xs text-amber-800">
-          💡 <strong>Tip:</strong> Before submitting, verify these aren't the same issue. 
+          💡 <strong>Tip:</strong> Before submitting, verify these aren&apos;t the same issue. 
           Multiple reports of the same problem increase resolution priority.
         </p>
       </div>
