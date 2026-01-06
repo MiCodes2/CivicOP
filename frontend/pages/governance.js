@@ -176,13 +176,15 @@ export default function GovernanceDashboard() {
         
         console.log('User profile:', data)
         
-        if (!data || data.role !== 'admin') {
-          console.log('User is not admin, redirecting to home')
+        // Allow admin, ward_admin, and ward_executive_engineer roles
+        const allowedRoles = ['admin', 'ward_admin', 'ward_executive_engineer'];
+        if (!data || !allowedRoles.includes(data.role)) {
+          console.log('User does not have governance access, redirecting to home')
           router.push('/')
           return
         }
         
-        console.log('Admin user verified, showing governance page')
+        console.log(`Governance access granted for role: ${data.role}`)
         setCurrentUser(data)
         setAuthChecked(true)
       } catch (err) {
@@ -265,8 +267,12 @@ export default function GovernanceDashboard() {
             </div>
             <div className="flex items-center space-x-3 border-l pl-4 border-gray-200">
                <div className="text-right hidden sm:block">
-                  <div className="text-sm font-bold text-gray-800">{currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || 'Admin'}</div>
-                  <div className="text-[10px] text-gray-500 uppercase">Governance Access</div>
+                  <div className="text-sm font-bold text-gray-800">{currentUser?.full_name || currentUser?.email?.split('@')[0] || 'User'}</div>
+                  <div className="text-[10px] text-gray-500 uppercase">
+                    {currentUser?.role === 'admin' && 'Super Administrator'}
+                    {currentUser?.role === 'ward_admin' && 'Ward Administrator'}
+                    {currentUser?.role === 'ward_executive_engineer' && 'Executive Engineer'}
+                  </div>
                </div>
                <div className="w-9 h-9 bg-blue-100 rounded-full border border-blue-200 flex items-center justify-center text-blue-700 font-bold text-xs">
                   {currentUser?.email?.charAt(0).toUpperCase() || 'A'}
