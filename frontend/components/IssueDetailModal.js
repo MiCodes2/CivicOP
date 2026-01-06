@@ -12,17 +12,56 @@ export default function IssueDetailModal({ issue, onClose, onUpdate, currentUser
   const [loading, setLoading] = useState(false);
   
   // Fetch ward users (ward admins and executive engineers) for assignment
+  // Filter based on current user's role permissions
   useEffect(() => {
     const fetchWardUsers = async () => {
-      if (!issue) return;
+      if (!issue || !currentUser) return;
       
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('users')
-          .select('id, full_name, email, role, designation')
-          .in('role', ['ward_admin', 'ward_executive_engineer', 'official'])
-          .eq('is_active', true)
-          .order('full_name');
+          .select('id, full_name, email, role, designation, assigned_wards')
+          .eq('is_active', true);
+        
+        // Filter based on current user's role
+        if (currentUser.role === 'admin') {
+          // Super admins can assign to anyone (ward_admin, ward_executive_engineer, official)
+          query = query.in('role', ['ward_admin', 'ward_executive_engineer', 'official']);
+        } else if (currentUser.role === 'ward_admin') {
+          // Ward admins can only assign to executive engineers in their assigned wards
+          query = query.eq('role', 'ward_executive_engineer');
+          
+          // Further filter engineers to only those in the ward admin's assigned wards
+          const { data: allEngineers, error: engineersError } = await query.order('full_name');
+          
+          if (engineersError) throw engineersError;
+          
+          // Extract issue ward number
+          const issueWardStr = issue.ward_number || '';
+          const issueWardMatch = issueWardStr.match(/\d+/);
+          const issueWardNum = issueWardMatch ? parseInt(issueWardMatch[0]) : null;
+          
+          // Filter engineers who are assigned to the same wards as this ward admin
+          const filteredEngineers = (allEngineers || []).filter(engineer => {
+            // Check if engineer has any overlapping wards with the ward admin
+            if (engineer.assigned_wards && currentUser.assigned_wards) {
+              const hasOverlap = engineer.assigned_wards.some(ward => 
+                currentUser.assigned_wards.includes(ward)
+              );
+              return hasOverlap;
+            }
+            return false;
+          });
+          
+          setWardUsers(filteredEngineers);
+          return;
+        } else {
+          // Executive engineers cannot assign tasks
+          setWardUsers([]);
+          return;
+        }
+        
+        const { data, error } = await query.order('full_name');
         
         if (error) throw error;
         setWardUsers(data || []);
@@ -32,7 +71,7 @@ export default function IssueDetailModal({ issue, onClose, onUpdate, currentUser
     };
     
     fetchWardUsers();
-  }, [issue]);
+  }, [issue, currentUser]);
   
   // Fetch assignment history
   useEffect(() => {
@@ -292,41 +331,61 @@ export default function IssueDetailModal({ issue, onClose, onUpdate, currentUser
           {/* Assignment Section */}
           {currentUser && (currentUser.role === 'admin' || currentUser.role === 'ward_admin') && (
             <div className="border-t pt-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">Assign to Team Member</h4>
-              <form onSubmit={handleAssign} className="space-y-3">
-                <div>
-                  <select
-                    value={assignmentData.assigned_to}
-                    onChange={(e) => setAssignmentData({...assignmentData, assigned_to: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                Assign to Team Member
+                {currentUser.role === 'ward_admin' && (
+                  <span className="ml-2 text-xs text-gray-500 font-normal">(Executive Engineers in your wards)</span>
+                )}
+              </h4>
+              
+              {wardUsers.length === 0 ? (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
+                  {currentUser.role === 'ward_admin' ? (
+                    <>
+                      ⚠️ <strong>No Executive Engineers Available:</strong> There are no executive engineers assigned to your wards (Wards: {currentUser.assigned_wards?.join(', ')}).
+                    </>
+                  ) : (
+                    <>
+                      ⚠️ <strong>No Users Available:</strong> No ward admins or executive engineers found in the system.
+                    </>
+                  )}
+                </div>
+              ) : (
+                <form onSubmit={handleAssign} className="space-y-3">
+                  <div>
+                    <select
+                      value={assignmentData.assigned_to}
+                      onChange={(e) => setAssignmentData({...assignmentData, assigned_to: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    >
+                      <option value="">Unassigned</option>
+                      {wardUsers.map(user => (
+                        <option key={user.id} value={user.id}>
+                          {user.full_name || user.email} ({user.role.replace('_', ' ')})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                
+                  <div>
+                    <textarea
+                      value={assignmentData.notes}
+                      onChange={(e) => setAssignmentData({...assignmentData, notes: e.target.value})}
+                      placeholder="Add notes (optional)"
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+                  
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium disabled:opacity-50"
                   >
-                    <option value="">Unassigned</option>
-                    {wardUsers.map(user => (
-                      <option key={user.id} value={user.id}>
-                        {user.full_name || user.email} ({user.role.replace('_', ' ')})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <textarea
-                    value={assignmentData.notes}
-                    onChange={(e) => setAssignmentData({...assignmentData, notes: e.target.value})}
-                    placeholder="Add notes (optional)"
-                    rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
-                </div>
-                
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium disabled:opacity-50"
-                >
-                  {loading ? 'Assigning...' : 'Assign Issue'}
-                </button>
-              </form>
+                    {loading ? 'Assigning...' : 'Assign Issue'}
+                  </button>
+                </form>
+              )}
             </div>
           )}
           

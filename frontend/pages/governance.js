@@ -1107,6 +1107,85 @@ function DashboardView({ incidents = [], loading = false, emergencyMode, setEmer
 }
 
 // ----------------------------------------------------------------------
+// Report Generation Helper
+// ----------------------------------------------------------------------
+function generateKanbanReport(incidents, filters) {
+  // Prepare report data
+  const reportDate = new Date().toLocaleString('en-IN', { 
+    timeZone: 'Asia/Kolkata',
+    dateStyle: 'full',
+    timeStyle: 'short' 
+  });
+  
+  const filtersApplied = [];
+  if (filters.category && filters.category !== 'All') filtersApplied.push(`Category: ${filters.category}`);
+  if (filters.ward) filtersApplied.push(`Ward: ${filters.ward}`);
+  if (filters.severity) filtersApplied.push(`Min Severity: ${filters.severity}`);
+  
+  // Generate CSV content
+  const csvHeaders = [
+    'Issue ID',
+    'Category',
+    'Status',
+    'Severity',
+    'Ward',
+    'Location',
+    'Description',
+    'Assigned To',
+    'Created Date',
+    'Updated Date'
+  ];
+  
+  const csvRows = incidents.map(incident => {
+    const createdDate = incident.created_at ? new Date(incident.created_at).toLocaleDateString('en-IN') : 'N/A';
+    const updatedDate = incident.updated_at ? new Date(incident.updated_at).toLocaleDateString('en-IN') : 'N/A';
+    const assignedTo = incident.assigned_to_name || 'Unassigned';
+    const description = (incident.description || 'N/A').replace(/"/g, '""').replace(/\n/g, ' ');
+    const location = (incident.location || 'N/A').replace(/"/g, '""');
+    
+    return [
+      `#${incident.id.toString().slice(-4)}`,
+      incident.category || 'N/A',
+      incident.status || 'N/A',
+      incident.severity || 'N/A',
+      incident.ward_number || 'N/A',
+      `"${location}"`,
+      `"${description}"`,
+      assignedTo,
+      createdDate,
+      updatedDate
+    ].join(',');
+  });
+  
+  // Build CSV content with metadata
+  let csvContent = `Civic Issues - Kanban Report\n`;
+  csvContent += `Generated: ${reportDate}\n`;
+  csvContent += `Total Issues: ${incidents.length}\n`;
+  if (filtersApplied.length > 0) {
+    csvContent += `Filters Applied: ${filtersApplied.join(', ')}\n`;
+  }
+  csvContent += `\nStatus Breakdown:\n`;
+  csvContent += `OPEN: ${incidents.filter(i => i.status === 'OPEN').length}\n`;
+  csvContent += `IN_PROGRESS: ${incidents.filter(i => i.status === 'IN_PROGRESS').length}\n`;
+  csvContent += `RESOLVED: ${incidents.filter(i => i.status === 'RESOLVED').length}\n`;
+  csvContent += `\n\n${csvHeaders.join(',')}\n`;
+  csvContent += csvRows.join('\n');
+  
+  // Create download
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  const fileName = `kanban_report_${new Date().toISOString().split('T')[0]}.csv`;
+  
+  link.setAttribute('href', url);
+  link.setAttribute('download', fileName);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// ----------------------------------------------------------------------
 // 5. KANBAN VIEW (Full Height Columns)
 // ----------------------------------------------------------------------
 function KanbanView({ incidents, setIncidents, filters, setFilters, refreshIncidents, loading }) {
@@ -1300,7 +1379,10 @@ function KanbanView({ incidents, setIncidents, filters, setFilters, refreshIncid
           {filteredIncidents.length} issues
         </span>
         
-        <button className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 shadow-sm font-medium">
+        <button 
+          onClick={() => generateKanbanReport(filteredIncidents, filters)}
+          className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 shadow-sm font-medium"
+        >
           Generate Report
         </button>
       </div>

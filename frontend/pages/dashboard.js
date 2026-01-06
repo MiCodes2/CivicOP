@@ -53,6 +53,17 @@ export default function Dashboard() {
     const resolvedCount = incidents.filter(i => { const s = (i.status || '').toUpperCase(); return s === 'RESOLVED' || s === 'CLOSED'; }).length;
     const resolutionRate = incidents.length > 0 ? Math.round((resolvedCount / incidents.length) * 100) : 0;
     
+    // Calculate average resolution time (in hours)
+    const resolvedWithTime = incidents.filter(i => {
+      const s = (i.status || '').toUpperCase();
+      return (s === 'RESOLVED' || s === 'CLOSED') && i.resolved_at && i.created_at;
+    });
+    const avgResolutionTime = resolvedWithTime.length > 0
+      ? Math.round(resolvedWithTime.reduce((sum, i) => 
+          sum + (new Date(i.resolved_at) - new Date(i.created_at)) / (1000 * 60 * 60), 0
+        ) / resolvedWithTime.length)
+      : 0;
+    
     const categories = incidents.reduce((acc, i) => {
       const cat = i.category || 'Other';
       acc[cat] = (acc[cat] || 0) + 1;
@@ -73,19 +84,19 @@ export default function Dashboard() {
     });
     const maxWeeklyCount = Math.max(...weeklyTrend.map(d => d.count), 1);
     
-    return { openCount, inProgressCount, resolvedCount, resolutionRate, categories, todayCount, weeklyTrend, maxWeeklyCount };
+    return { openCount, inProgressCount, resolvedCount, resolutionRate, categories, todayCount, weeklyTrend, maxWeeklyCount, avgResolutionTime };
   }, [incidents]);
 
   const recentIncidents = incidents.slice(0, 5);
   const statusColors = { 'OPEN': 'bg-orange-100 text-orange-700', 'IN_PROGRESS': 'bg-blue-100 text-blue-700', 'RESOLVED': 'bg-green-100 text-green-700', 'CLOSED': 'bg-gray-100 text-gray-700' };
   const catIcons = { 'Pothole': '🕳️', 'Garbage': '🗑️', 'Streetlight': '💡', 'Water Leak': '💧', 'Road Damage': '🚧', 'Other': '📍' };
 
-  // Donut chart calculations
+  // Donut chart calculations with enhanced colors
   const total = incidents.length || 1;
   const donutSegments = [
-    { label: 'Open', count: stats.openCount, color: '#f97316', percent: (stats.openCount / total) * 100 },
-    { label: 'In Progress', count: stats.inProgressCount, color: '#3b82f6', percent: (stats.inProgressCount / total) * 100 },
-    { label: 'Resolved', count: stats.resolvedCount, color: '#22c55e', percent: (stats.resolvedCount / total) * 100 },
+    { label: 'Open', count: stats.openCount, color: '#f97316', gradient: 'from-orange-500 to-orange-600', percent: (stats.openCount / total) * 100, icon: '📋' },
+    { label: 'In Progress', count: stats.inProgressCount, color: '#3b82f6', gradient: 'from-blue-500 to-blue-600', percent: (stats.inProgressCount / total) * 100, icon: '🔧' },
+    { label: 'Resolved', count: stats.resolvedCount, color: '#22c55e', gradient: 'from-green-500 to-green-600', percent: (stats.resolvedCount / total) * 100, icon: '✅' },
   ];
 
   return (
@@ -164,6 +175,32 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Average Resolution Time Card */}
+            {stats.avgResolutionTime > 0 && (
+              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl shadow-sm border-2 border-purple-200 p-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-purple-700 uppercase tracking-wider flex items-center gap-2">
+                      <span className="text-lg">⚡</span>
+                      <span>Avg Resolution Time</span>
+                    </p>
+                    <div className="flex items-baseline gap-2 mt-2">
+                      <p className="text-3xl md:text-4xl font-black bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                        {stats.avgResolutionTime}
+                      </p>
+                      <span className="text-lg font-semibold text-purple-600">hours</span>
+                    </div>
+                    <p className="text-xs text-purple-600 mt-2 font-medium">
+                      📊 Based on {incidents.filter(i => i.resolved_at).length} resolved issues
+                    </p>
+                  </div>
+                  <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center text-3xl shadow-lg">
+                    ⏱️
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               {/* Weekly Trend Chart */}
@@ -189,15 +226,25 @@ export default function Dashboard() {
               </div>
 
               {/* Status Distribution Donut */}
-              <div className="bg-white rounded-xl shadow-sm border p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-gray-900">🎯 Status Distribution</h3>
-                  <span className="text-[10px] text-gray-500">{incidents.length} total</span>
+              <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow-lg border-2 border-gray-100 p-6 hover:shadow-xl transition-shadow duration-300">
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <span className="text-lg">🎯</span>
+                    <span>Status Distribution</span>
+                  </h3>
+                  <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-1 rounded-full font-semibold">{incidents.length} total</span>
                 </div>
                 <div className="flex items-center gap-6">
-                  {/* SVG Donut Chart */}
+                  {/* SVG Donut Chart with Glow Effect */}
                   <div className="relative w-36 h-36 flex-shrink-0">
-                    <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                    {/* Outer glow ring */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-orange-200 via-blue-200 to-green-200 rounded-full blur-xl opacity-30 animate-pulse"></div>
+                    
+                    <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90 relative z-10">
+                      {/* Background circle */}
+                      <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f3f4f6" strokeWidth="4" />
+                      
+                      {/* Segments with enhanced styling */}
                       {(() => {
                         let cumulativePercent = 0;
                         return donutSegments.map((seg, idx) => {
@@ -210,36 +257,62 @@ export default function Dashboard() {
                               cx="18" cy="18" r="15.915"
                               fill="none"
                               stroke={seg.color}
-                              strokeWidth="3.5"
+                              strokeWidth="4"
                               strokeDasharray={strokeDasharray}
                               strokeDashoffset={strokeDashoffset}
                               strokeLinecap="round"
-                              className="transition-all duration-500"
+                              className="transition-all duration-700 ease-out hover:stroke-width-5"
+                              style={{
+                                filter: `drop-shadow(0 0 3px ${seg.color}40)`,
+                              }}
                             />
                           );
                         });
                       })()}
-                      {/* Background circle */}
-                      <circle cx="18" cy="18" r="15.915" fill="none" stroke="#e5e7eb" strokeWidth="3.5" className="-z-10" style={{ zIndex: -1 }} />
                     </svg>
+                    
+                    {/* Center content with gradient background */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-2xl font-bold text-gray-900">{stats.resolutionRate}%</span>
-                      <span className="text-[10px] text-gray-500">Resolved</span>
+                      <div className="text-center">
+                        <span className="text-3xl font-black bg-gradient-to-br from-gray-700 to-gray-900 bg-clip-text text-transparent">
+                          {stats.resolutionRate}%
+                        </span>
+                        <span className="block text-[10px] text-gray-500 font-semibold mt-0.5">Resolved</span>
+                      </div>
                     </div>
                   </div>
-                  {/* Legend */}
+                  
+                  {/* Enhanced Legend with icons */}
                   <div className="flex-1 space-y-3">
                     {donutSegments.map((seg, idx) => (
-                      <div key={idx} className="flex items-center gap-3">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: seg.color }}></div>
-                        <div className="flex-1">
-                          <div className="flex justify-between items-center">
-                            <span className="text-xs text-gray-700 font-medium">{seg.label}</span>
-                            <span className="text-xs font-bold text-gray-900">{seg.count}</span>
+                      <div key={idx} className="group hover:scale-105 transition-transform duration-200">
+                        <div className="flex items-center gap-3 mb-1.5">
+                          <div 
+                            className="w-4 h-4 rounded-full shadow-md transition-all duration-300 group-hover:scale-125" 
+                            style={{ 
+                              backgroundColor: seg.color,
+                              boxShadow: `0 0 8px ${seg.color}60`
+                            }}
+                          ></div>
+                          <div className="flex-1">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-gray-700 font-semibold flex items-center gap-1">
+                                <span>{seg.icon}</span>
+                                <span>{seg.label}</span>
+                              </span>
+                              <span className="text-sm font-bold text-gray-900">{seg.count}</span>
+                            </div>
                           </div>
-                          <div className="w-full bg-gray-100 rounded-full h-1 mt-1">
-                            <div className="h-1 rounded-full transition-all duration-500" style={{ width: `${seg.percent}%`, backgroundColor: seg.color }}></div>
-                          </div>
+                        </div>
+                        {/* Progress bar with gradient */}
+                        <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden shadow-inner">
+                          <div 
+                            className={`h-2 rounded-full bg-gradient-to-r ${seg.gradient} transition-all duration-700 ease-out shadow-sm`}
+                            style={{ 
+                              width: `${seg.percent}%`,
+                              boxShadow: `0 0 6px ${seg.color}60`
+                            }}
+                          ></div>
                         </div>
                       </div>
                     ))}

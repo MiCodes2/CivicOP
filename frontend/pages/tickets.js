@@ -257,9 +257,25 @@ export default function Tickets() {
                         ⚡ Severity {severity}/5
                       </span>
                     </div>
-                    <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                      <span>{new Date(ticket.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
-                      {ticket.ward_number && <span className="text-purple-600">Ward {ticket.ward_number}</span>}
+                    <div className="mt-3 space-y-2">
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <span title="Created">🕐</span>
+                          {new Date(ticket.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        {ticket.ward_number && <span className="text-purple-600">Ward {ticket.ward_number}</span>}
+                      </div>
+                      {ticket.resolved_at && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="flex items-center gap-1 text-green-600">
+                            <span title="Resolved">✅</span>
+                            {new Date(ticket.resolved_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <span className="text-green-600 font-semibold" title="Resolution Time">
+                            ⚡ {Math.round((new Date(ticket.resolved_at) - new Date(ticket.created_at)) / (1000 * 60 * 60))}h
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
