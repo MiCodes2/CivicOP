@@ -257,7 +257,7 @@ export default function AIHub() {
             {/* Quick Stats */}
             <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-6">
               <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <span>📈</span> Today's Performance
+                <span>📈</span> Today&apos;s Performance
               </h2>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
