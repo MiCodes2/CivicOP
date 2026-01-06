@@ -4,6 +4,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { supabase, dbHelpers, authHelpers } from '../lib/supabase';
+import IssueDetailModal from '../components/IssueDetailModal';
+import { BENGALURU_WARDS, getZones } from '../lib/bengaluru_wards';
 
 // ----------------------------------------------------------------------
 // 1. DYNAMIC MAP LOADING
@@ -37,6 +39,11 @@ export default function GovernanceDashboard() {
     category: 'All Categories',
     severity: 1
   });
+  
+  // State for map view actions
+  const [showAlerts, setShowAlerts] = useState(false);
+  const [showAssignPanel, setShowAssignPanel] = useState(false);
+  const [emergencyMode, setEmergencyMode] = useState(false);
 
   // Shared incidents state - lifted up for all views to use
   const [sharedIncidents, setSharedIncidents] = useState([]);
@@ -128,7 +135,7 @@ export default function GovernanceDashboard() {
         }
         
         console.log('Admin user verified, showing governance page')
-        setCurrentUser(user)
+        setCurrentUser(data)
         setAuthChecked(true)
       } catch (err) {
         console.error('Auth check failed:', err)
@@ -191,6 +198,7 @@ export default function GovernanceDashboard() {
             {/* Top Navigation Tabs */}
             <nav className="flex space-x-1 ml-2 md:ml-4">
                <NavTab label="Dashboard" icon="📊" active={activeNav === 'dashboard'} onClick={() => setActiveNav('dashboard')} />
+               <NavTab label="All Issues" icon="📋" active={activeNav === 'all-issues'} onClick={() => setActiveNav('all-issues')} />
                <NavTab label="Map View" icon="🗺️" active={activeNav === 'map'} onClick={() => setActiveNav('map')} />
                <NavTab label="Workflow Triage" icon="🎫" active={activeNav === 'tickets' || activeNav === 'ai'} onClick={() => setActiveNav('tickets')} />
                <NavTab label="IoT" icon="📡" active={activeNav === 'iot'} onClick={() => setActiveNav('iot')} />
@@ -232,8 +240,9 @@ export default function GovernanceDashboard() {
       <main className="flex-1 w-full bg-gray-50 overflow-hidden relative p-2">
           {/* Internal Container maintains 100% height */}
           <div className="h-full w-full flex flex-col">
-            {activeNav === 'dashboard' && <DashboardView incidents={sharedIncidents} loading={incidentsLoading} />}
-            {activeNav === 'map' && <MapView incidents={sharedIncidents} />}
+            {activeNav === 'dashboard' && <DashboardView incidents={sharedIncidents} loading={incidentsLoading} emergencyMode={emergencyMode} setEmergencyMode={setEmergencyMode} showAlerts={showAlerts} setShowAlerts={setShowAlerts} showAssignPanel={showAssignPanel} setShowAssignPanel={setShowAssignPanel} />}
+            {activeNav === 'all-issues' && <AllIssuesView incidents={sharedIncidents} loading={incidentsLoading} refreshIncidents={fetchSharedIncidents} />}
+            {activeNav === 'map' && <MapView incidents={sharedIncidents} currentUser={currentUser} emergencyMode={emergencyMode} setEmergencyMode={setEmergencyMode} showAlerts={showAlerts} setShowAlerts={setShowAlerts} showAssignPanel={showAssignPanel} setShowAssignPanel={setShowAssignPanel} />}
             {(activeNav === 'tickets' || activeNav === 'ai') && <KanbanView incidents={sharedIncidents} setIncidents={setSharedIncidents} filters={filters} setFilters={setFilters} refreshIncidents={fetchSharedIncidents} loading={incidentsLoading} />}
             {activeNav === 'iot' && <IoTView />}
           </div>
@@ -287,10 +296,338 @@ function NavTab({ label, active, onClick, icon }) {
 }
 
 // ----------------------------------------------------------------------
+// 3B. ALL ISSUES VIEW (Comprehensive Table with Search & Filtering)
+// ----------------------------------------------------------------------
+function AllIssuesView({ incidents = [], loading = false, refreshIncidents }) {
+  const [selectedIssue, setSelectedIssue] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [wardFilter, setWardFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState('desc');
+
+  // Fetch current user
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const user = await authHelpers.getUser();
+        if (user) {
+          const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+          
+          if (!error && data) {
+            setCurrentUser(data);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching user:', err);
+      }
+    };
+    
+    fetchUser();
+  }, []);
+
+  // Filter and search incidents
+  const filteredIncidents = useMemo(() => {
+    let result = [...incidents];
+
+    // Search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(i => 
+        i.category?.toLowerCase().includes(term) ||
+        i.description?.toLowerCase().includes(term) ||
+        i.address?.toLowerCase().includes(term) ||
+        i.ward_number?.toLowerCase().includes(term) ||
+        i.id?.toLowerCase().includes(term)
+      );
+    }
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      result = result.filter(i => (i.status || 'OPEN').toUpperCase() === statusFilter.toUpperCase());
+    }
+
+    // Ward filter
+    if (wardFilter !== 'all') {
+      result = result.filter(i => {
+        const wardNum = i.ward_number?.match(/\d+/)?.[0];
+        return wardNum === wardFilter;
+      });
+    }
+
+    // Ward-based access control
+    if (currentUser) {
+      if (currentUser.role === 'ward_admin' && currentUser.assigned_wards?.length > 0) {
+        result = result.filter(i => {
+          const wardNum = i.ward_number_parsed || parseInt(i.ward_number?.match(/\d+/)?.[0]);
+          return wardNum && currentUser.assigned_wards.includes(wardNum);
+        });
+      } else if (currentUser.role === 'ward_executive_engineer') {
+        result = result.filter(i => i.assigned_to === currentUser.id);
+      }
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      let aVal = a[sortBy];
+      let bVal = b[sortBy];
+      
+      if (sortBy === 'created_at' || sortBy === 'updated_at') {
+        aVal = new Date(aVal).getTime();
+        bVal = new Date(bVal).getTime();
+      }
+      
+      if (sortOrder === 'asc') {
+        return aVal > bVal ? 1 : -1;
+      } else {
+        return aVal < bVal ? 1 : -1;
+      }
+    });
+
+    return result;
+  }, [incidents, searchTerm, statusFilter, wardFilter, sortBy, sortOrder, currentUser]);
+
+  const getStatusBadge = (status) => {
+    const statusColors = {
+      'OPEN': 'bg-orange-100 text-orange-700 border-orange-200',
+      'IN_PROGRESS': 'bg-blue-100 text-blue-700 border-blue-200',
+      'RESOLVED': 'bg-green-100 text-green-700 border-green-200',
+      'CLOSED': 'bg-gray-100 text-gray-700 border-gray-200'
+    };
+    const normalizedStatus = (status || 'OPEN').toUpperCase();
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-bold border ${statusColors[normalizedStatus] || statusColors['OPEN']}`}>
+        {normalizedStatus === 'RESOLVED' ? '✅ ' : normalizedStatus === 'IN_PROGRESS' ? '🔧 ' : ''}
+        {normalizedStatus}
+      </span>
+    );
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-white rounded-lg shadow-sm border">
+      {/* Header with Search and Filters */}
+      <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-transparent">
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <div className="flex-1">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">All Issues</h2>
+            <p className="text-sm text-gray-600">Manage and assign civic issues across all wards</p>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-gray-700">
+              {filteredIncidents.length} {filteredIncidents.length === 1 ? 'issue' : 'issues'}
+            </span>
+            <button
+              onClick={refreshIncidents}
+              className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+            >
+              🔄 Refresh
+            </button>
+          </div>
+        </div>
+
+        {/* Filters Row */}
+        <div className="mt-4 flex flex-wrap gap-3">
+          {/* Search */}
+          <div className="flex-1 min-w-[200px]">
+            <input
+              type="text"
+              placeholder="Search by category, description, address, ward..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+          </div>
+
+          {/* Status Filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+          >
+            <option value="all">All Status</option>
+            <option value="OPEN">Open</option>
+            <option value="IN_PROGRESS">In Progress</option>
+            <option value="RESOLVED">Resolved</option>
+            <option value="CLOSED">Closed</option>
+          </select>
+
+          {/* Ward Filter */}
+          <select
+            value={wardFilter}
+            onChange={(e) => setWardFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm max-w-[200px]"
+          >
+            <option value="all">All Wards</option>
+            {getZones().map(zone => (
+              <optgroup key={zone} label={`${zone} Zone`}>
+                {BENGALURU_WARDS.filter(w => w.zone === zone).slice(0, 10).map(ward => (
+                  <option key={ward.number} value={ward.number.toString()}>
+                    Ward {ward.number}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+
+          {/* Sort */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+          >
+            <option value="created_at">Date Created</option>
+            <option value="updated_at">Last Updated</option>
+            <option value="severity">Severity</option>
+            <option value="status">Status</option>
+          </select>
+
+          <button
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium"
+            title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+          >
+            {sortOrder === 'asc' ? '↑' : '↓'}
+          </button>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="flex-1 overflow-auto">
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="text-gray-600 mt-4">Loading issues...</p>
+            </div>
+          </div>
+        ) : filteredIncidents.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="text-6xl mb-4">📋</div>
+              <p className="text-gray-600 font-medium">No issues found</p>
+              <p className="text-sm text-gray-500 mt-2">Try adjusting your filters</p>
+            </div>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead className="bg-gray-50 sticky top-0 z-10">
+              <tr className="border-b">
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">ID</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Category</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Description</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Ward</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Severity</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Created</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {filteredIncidents.map((issue) => (
+                <tr 
+                  key={issue.id} 
+                  className="hover:bg-gray-50 cursor-pointer transition"
+                  onClick={() => setSelectedIssue(issue)}
+                >
+                  <td className="px-4 py-3">
+                    <span className="text-xs font-mono text-gray-600">
+                      #{issue.id.slice(-8).toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">
+                        {issue.category === 'Pothole' ? '🕳️' :
+                         issue.category === 'Garbage' ? '🗑️' :
+                         issue.category === 'Streetlight' ? '💡' :
+                         issue.category === 'Water Leak' ? '💧' : '📍'}
+                      </span>
+                      <span className="text-sm font-medium text-gray-900">{issue.category}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-sm text-gray-700 line-clamp-2 max-w-md">
+                      {issue.description}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-sm text-gray-600">
+                      {issue.ward_number || 'N/A'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {getStatusBadge(issue.status)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      {[...Array(5)].map((_, i) => (
+                        <div
+                          key={i}
+                          className={`w-2 h-2 rounded-full ${
+                            i < (issue.severity || 3)
+                              ? (issue.severity >= 4 ? 'bg-red-500' : issue.severity === 3 ? 'bg-orange-500' : 'bg-yellow-500')
+                              : 'bg-gray-300'
+                          }`}
+                        />
+                      ))}
+                      <span className="text-xs text-gray-600 ml-1">{issue.severity || 3}/5</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-xs text-gray-600">
+                      {new Date(issue.created_at).toLocaleDateString('en-IN', { 
+                        day: 'numeric', 
+                        month: 'short',
+                        year: 'numeric'
+                      })}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedIssue(issue);
+                      }}
+                      className="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs font-medium"
+                    >
+                      👁️ View & Assign
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Issue Detail Modal */}
+      {selectedIssue && (
+        <IssueDetailModal
+          issue={selectedIssue}
+          currentUser={currentUser}
+          onClose={() => setSelectedIssue(null)}
+          onUpdate={(updatedIssue) => {
+            setSelectedIssue(null);
+            if (refreshIncidents) refreshIncidents();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------
 // 4. DASHBOARD VIEW (Full Width Map + Fixed Sidebar)
 // ----------------------------------------------------------------------
-function DashboardView({ incidents = [], loading = false }) {
+function DashboardView({ incidents = [], loading = false, emergencyMode, setEmergencyMode, showAlerts, setShowAlerts, showAssignPanel, setShowAssignPanel }) {
   const [layerToggles, setLayerToggles] = useState({ traffic: true, infra: true, predictiveFlood: false });
+  const [selectedIssue, setSelectedIssue] = useState(null);
 
   // Derive comprehensive stats from shared incidents
   const openCount = incidents.filter(i => i.status === 'OPEN' || !i.status).length;
@@ -321,12 +658,50 @@ function DashboardView({ incidents = [], loading = false }) {
     ? Math.round((resolvedCount / incidents.length) * 100) 
     : 0;
   
-  // Average response time (mock calculation based on status)
-  const avgResponseTime = inProgressCount > 0 ? '2.4h' : 'N/A';
+  // Calculate average response time from real data
+  const avgResponseTime = useMemo(() => {
+    const resolvedIssues = incidents.filter(i => {
+      const status = (i.status || '').toUpperCase();
+      return (status === 'RESOLVED' || status === 'CLOSED') && i.resolved_at && i.created_at;
+    });
+    
+    if (resolvedIssues.length === 0) return 'N/A';
+    
+    const totalHours = resolvedIssues.reduce((sum, issue) => {
+      const created = new Date(issue.created_at);
+      const resolved = new Date(issue.resolved_at);
+      const hours = (resolved - created) / (1000 * 60 * 60);
+      return sum + hours;
+    }, 0);
+    
+    const avgHours = totalHours / resolvedIssues.length;
+    
+    if (avgHours < 1) {
+      return `${Math.round(avgHours * 60)}m`;
+    } else if (avgHours < 24) {
+      return `${avgHours.toFixed(1)}h`;
+    } else {
+      return `${(avgHours / 24).toFixed(1)}d`;
+    }
+  }, [incidents]);
 
   // Get critical incidents
   const criticalIncidents = incidents.filter(i => i.severity >= 4).slice(0, 3);
   const latestIncidents = incidents.slice(0, 5);
+  
+  // Find top hotspot ward
+  const topHotspotWard = useMemo(() => {
+    const wardCounts = {};
+    incidents.forEach(i => {
+      const wardNum = i.ward_number?.match(/\d+/)?.[0];
+      if (wardNum) {
+        wardCounts[wardNum] = (wardCounts[wardNum] || 0) + 1;
+      }
+    });
+    
+    const topWard = Object.entries(wardCounts).sort((a, b) => b[1] - a[1])[0];
+    return topWard ? { ward: topWard[0], count: topWard[1] } : { ward: 'N/A', count: 0 };
+  }, [incidents]);
 
   return (
     <div className="flex h-full gap-3">
@@ -360,13 +735,17 @@ function DashboardView({ incidents = [], loading = false }) {
 
         {/* Map Canvas */}
         <div className="flex-1 relative bg-gray-100 min-h-0">
-          <DynamicMap incidents={incidents} userLocation={null} fillHeight />
+          <DynamicMap 
+            incidents={emergencyMode ? incidents.filter(i => i.severity >= 4 && i.status !== 'RESOLVED' && i.status !== 'CLOSED') : incidents} 
+            userLocation={null} 
+            fillHeight 
+          />
           
           {/* Floating Overlays - Admin-only detailed info */}
           <div className="absolute top-4 left-4 bg-white/95 backdrop-blur rounded-lg shadow-lg border border-gray-100 p-3 min-w-[160px]">
              <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">🎯 Hotspot Cluster</div>
-             <div className="text-lg font-bold text-gray-800">Ward 15</div>
-             <div className="text-[10px] text-gray-500 mt-1">{criticalCount} critical issues</div>
+             <div className="text-lg font-bold text-gray-800">Ward {topHotspotWard.ward}</div>
+             <div className="text-[10px] text-gray-500 mt-1">{topHotspotWard.count} issues • {criticalCount} critical</div>
           </div>
           
           <div className="absolute top-4 right-4 bg-white/95 backdrop-blur rounded-lg shadow-lg border border-gray-100 p-3 min-w-[140px]">
@@ -377,15 +756,103 @@ function DashboardView({ incidents = [], loading = false }) {
              </div>
           </div>
           
-          <div className="absolute bottom-4 left-4 bg-green-50/95 backdrop-blur rounded-lg shadow-sm border border-green-200 p-2 px-3 flex items-center space-x-2">
-             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-             <div className="text-xs font-bold text-green-800">SENSOR: AQI NORMAL (45)</div>
-          </div>
           
           <div className="absolute bottom-4 right-4 bg-blue-50/95 backdrop-blur rounded-lg shadow-sm border border-blue-200 p-2 px-3 flex items-center space-x-2">
              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
              <div className="text-xs font-bold text-blue-800">AVG RESPONSE: {avgResponseTime}</div>
           </div>
+          
+          {/* Alerts Panel - Critical Issues */}
+          {showAlerts && (
+            <div className="absolute top-16 right-4 bg-white/98 backdrop-blur rounded-lg shadow-2xl border border-orange-300 w-80 max-h-96 overflow-y-auto z-50">
+              <div className="sticky top-0 bg-gradient-to-r from-orange-600 to-red-600 text-white px-4 py-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🚨</span>
+                  <h3 className="font-bold text-sm">Critical Alerts</h3>
+                </div>
+                <button onClick={() => setShowAlerts(false)} className="hover:bg-white/20 rounded p-1">×</button>
+              </div>
+              <div className="p-3 space-y-2">
+                {incidents.filter(i => i.severity >= 4 && i.status !== 'RESOLVED' && i.status !== 'CLOSED').length === 0 ? (
+                  <div className="text-center py-6 text-gray-500 text-sm">
+                    ✅ No critical alerts
+                  </div>
+                ) : (
+                  incidents
+                    .filter(i => i.severity >= 4 && i.status !== 'RESOLVED' && i.status !== 'CLOSED')
+                    .slice(0, 10)
+                    .map(incident => (
+                      <div 
+                        key={incident.id}
+                        onClick={() => {
+                          setSelectedIssue(incident);
+                          setShowAlerts(false);
+                        }}
+                        className="bg-red-50 border border-red-200 rounded p-2 cursor-pointer hover:shadow-md transition"
+                      >
+                        <div className="flex justify-between items-start">
+                          <span className="font-bold text-xs text-red-700">#{incident.id.toString().slice(-4)} {incident.category}</span>
+                          <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded font-bold">SEV {incident.severity}</span>
+                        </div>
+                        <div className="text-[10px] text-gray-600 mt-1 truncate">📍 {incident.address || 'Location unavailable'}</div>
+                        <div className="text-[9px] text-gray-500 mt-1">
+                          {incident.assigned_to ? '👤 Assigned' : '⚠️ Unassigned'} • {new Date(incident.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
+          )}
+          
+          {/* Assign Panel - Unassigned Issues */}
+          {showAssignPanel && (
+            <div className="absolute top-16 right-4 bg-white/98 backdrop-blur rounded-lg shadow-2xl border border-blue-300 w-80 max-h-96 overflow-y-auto z-50">
+              <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">👥</span>
+                  <h3 className="font-bold text-sm">Unassigned Issues</h3>
+                </div>
+                <button onClick={() => setShowAssignPanel(false)} className="hover:bg-white/20 rounded p-1">×</button>
+              </div>
+              <div className="p-3 space-y-2">
+                {incidents.filter(i => !i.assigned_to && i.status !== 'RESOLVED' && i.status !== 'CLOSED').length === 0 ? (
+                  <div className="text-center py-6 text-gray-500 text-sm">
+                    ✅ All issues assigned
+                  </div>
+                ) : (
+                  incidents
+                    .filter(i => !i.assigned_to && i.status !== 'RESOLVED' && i.status !== 'CLOSED')
+                    .slice(0, 10)
+                    .map(incident => (
+                      <div 
+                        key={incident.id}
+                        onClick={() => {
+                          setSelectedIssue(incident);
+                          setShowAssignPanel(false);
+                        }}
+                        className="bg-blue-50 border border-blue-200 rounded p-2 cursor-pointer hover:shadow-md transition"
+                      >
+                        <div className="flex justify-between items-start">
+                          <span className="font-bold text-xs text-blue-700">#{incident.id.toString().slice(-4)} {incident.category}</span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                            incident.severity >= 4 ? 'bg-red-100 text-red-700' : 
+                            incident.severity === 3 ? 'bg-yellow-100 text-yellow-700' : 
+                            'bg-blue-100 text-blue-700'
+                          }`}>
+                            SEV {incident.severity}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-gray-600 mt-1 truncate">📍 {incident.address || 'Location unavailable'}</div>
+                        <div className="text-[9px] text-gray-500 mt-1">
+                          Status: {incident.status || 'OPEN'} • {new Date(incident.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -505,6 +972,33 @@ function DashboardView({ incidents = [], loading = false }) {
 function KanbanView({ incidents, setIncidents, filters, setFilters, refreshIncidents, loading }) {
   const [message, setMessage] = useState(null);
   const [draggedItem, setDraggedItem] = useState(null);
+  const [selectedIssue, setSelectedIssue] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  // Fetch current user for permission checks
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const user = await authHelpers.getUser();
+        if (user) {
+          // Fetch user profile with role
+          const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+          
+          if (!error && data) {
+            setCurrentUser(data);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching user:', err);
+      }
+    };
+    
+    fetchUser();
+  }, []);
 
   // Filter incidents based on current filters
   const filteredIncidents = useMemo(() => {
@@ -518,10 +1012,45 @@ function KanbanView({ incidents, setIncidents, filters, setFilters, refreshIncid
       result = result.filter(i => (i.severity || 0) >= filters.severity);
     }
     
+    if (filters.ward && filters.ward !== 'All Wards') {
+      result = result.filter(i => {
+        const wardNum = i.ward_number?.match(/\d+/)?.[0];
+        return wardNum === filters.ward;
+      });
+    }
+    
+    // Ward-based access control
+    if (currentUser) {
+      if (currentUser.role === 'ward_admin' && currentUser.assigned_wards?.length > 0) {
+        // Ward admins only see their assigned wards
+        result = result.filter(i => {
+          const wardNum = i.ward_number_parsed || parseInt(i.ward_number?.match(/\d+/)?.[0]);
+          return wardNum && currentUser.assigned_wards.includes(wardNum);
+        });
+      } else if (currentUser.role === 'ward_executive_engineer') {
+        // Executive engineers only see issues assigned to them
+        result = result.filter(i => i.assigned_to === currentUser.id);
+      }
+      // Admins and officials see everything
+    }
+    
     return result;
-  }, [incidents, filters.category, filters.severity]);
+  }, [incidents, filters.category, filters.severity, filters.ward, currentUser]);
 
   const updateIncidentStatus = async (id, newStatus) => {
+    // Check if moving to IN_PROGRESS or RESOLVED requires assignment
+    if (newStatus === 'IN_PROGRESS' || newStatus === 'RESOLVED') {
+      const incident = incidents.find(i => i.id === id);
+      if (!incident?.assigned_to) {
+        const statusLabel = newStatus === 'IN_PROGRESS' ? 'In Progress' : 'Resolved';
+        setMessage(`⚠️ Please assign this issue to someone before moving to ${statusLabel}`);
+        setTimeout(() => setMessage(null), 3500);
+        // Open the issue detail modal for assignment
+        setSelectedIssue(incident);
+        return false;
+      }
+    }
+    
     // Optimistic UI update
     const prevIncidents = [...incidents];
     setIncidents(prev => prev.map(i => i.id === id ? { ...i, status: newStatus } : i));
@@ -574,8 +1103,9 @@ function KanbanView({ incidents, setIncidents, filters, setFilters, refreshIncid
   return (
     <div className="h-full flex flex-col space-y-3">
       {/* Compact Filter Bar */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-2 flex items-center space-x-4 shrink-0">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-2 flex flex-wrap items-center gap-3 shrink-0">
         <span className="font-bold text-gray-700 text-xs uppercase ml-2">Filters:</span>
+        
         <select 
           value={filters.category} 
           onChange={(e) => setFilters({...filters, category: e.target.value})}
@@ -588,6 +1118,25 @@ function KanbanView({ incidents, setIncidents, filters, setFilters, refreshIncid
           <option>Water Leak</option>
           <option>Road Damage</option>
           <option>Other</option>
+        </select>
+        
+        <div className="h-4 w-px bg-gray-300"></div>
+        
+        <select 
+          value={filters.ward || 'All Wards'} 
+          onChange={(e) => setFilters({...filters, ward: e.target.value === 'All Wards' ? null : e.target.value})}
+          className="px-2 py-1 border border-gray-300 rounded text-xs focus:ring-blue-500 bg-gray-50 max-w-[200px]"
+        >
+          <option>All Wards</option>
+          {getZones().map(zone => (
+            <optgroup key={zone} label={`${zone} Zone`}>
+              {BENGALURU_WARDS.filter(w => w.zone === zone).map(ward => (
+                <option key={ward.number} value={ward.number.toString()}>
+                  Ward {ward.number} - {ward.name}
+                </option>
+              ))}
+            </optgroup>
+          ))}
         </select>
         
         <div className="h-4 w-px bg-gray-300"></div>
@@ -605,6 +1154,12 @@ function KanbanView({ incidents, setIncidents, filters, setFilters, refreshIncid
         </div>
         
         <div className="flex-1"></div>
+        
+        {/* Results count */}
+        <span className="text-xs text-gray-600 font-medium">
+          {filteredIncidents.length} issues
+        </span>
+        
         <button className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 shadow-sm font-medium">
           Generate Report
         </button>
@@ -657,8 +1212,10 @@ function KanbanView({ incidents, setIncidents, filters, setFilters, refreshIncid
                     createdAt={incident.created_at}
                     status={incident.status || 'OPEN'}
                     incidentId={incident.id}
+                    incident={incident}
                     onStatusChange={updateIncidentStatus}
                     setMessage={setMessage}
+                    onClick={() => setSelectedIssue(incident)}
                   />
                 ))
               )}
@@ -687,6 +1244,16 @@ function KanbanView({ incidents, setIncidents, filters, setFilters, refreshIncid
                   const payload = JSON.parse(e.dataTransfer.getData('text/plain'));
                   console.log('Dropped on IN_PROGRESS:', payload);
                   if (payload && payload.id) {
+                    // Check if issue is assigned before moving to IN_PROGRESS
+                    const issue = incidents.find(i => i.id === payload.id);
+                    if (!issue?.assigned_to) {
+                      setMessage('⚠️ Assignment Required: Please assign this issue before moving to In Progress');
+                      setTimeout(() => setMessage(null), 3500);
+                      // Open the modal for assignment
+                      setSelectedIssue(issue);
+                      return;
+                    }
+                    
                     const ok = await updateIncidentStatus(payload.id, 'IN_PROGRESS')
                     if (!ok) {
                       console.error('Update failed for', payload.id);
@@ -712,8 +1279,10 @@ function KanbanView({ incidents, setIncidents, filters, setFilters, refreshIncid
                     createdAt={incident.created_at}
                     status={incident.status || 'IN_PROGRESS'}
                     incidentId={incident.id}
+                    incident={incident}
                     onStatusChange={updateIncidentStatus}
                     setMessage={setMessage}
+                    onClick={() => setSelectedIssue(incident)}
                   />
                 ))
               )}
@@ -742,6 +1311,16 @@ function KanbanView({ incidents, setIncidents, filters, setFilters, refreshIncid
                   const payload = JSON.parse(e.dataTransfer.getData('text/plain'));
                   console.log('Dropped on RESOLVED:', payload);
                   if (payload && payload.id) {
+                    // Check if issue is assigned before resolving
+                    const issue = incidents.find(i => i.id === payload.id);
+                    if (!issue?.assigned_to) {
+                      setMessage('⚠️ Assignment Required: Please assign this issue before resolving it');
+                      setTimeout(() => setMessage(null), 3500);
+                      // Open the modal for assignment
+                      setSelectedIssue(issue);
+                      return;
+                    }
+                    
                     const ok = await updateIncidentStatus(payload.id, 'RESOLVED')
                     if (!ok) {
                       console.error('Update failed for', payload.id);
@@ -766,14 +1345,30 @@ function KanbanView({ incidents, setIncidents, filters, setFilters, refreshIncid
                     createdAt={incident.created_at}
                     status={incident.status || 'RESOLVED'}
                     incidentId={incident.id}
+                    incident={incident}
                     onStatusChange={updateIncidentStatus}
                     setMessage={setMessage}
+                    onClick={() => setSelectedIssue(incident)}
                   />
                 ))
               )}
            </div>
         </div>
       </div>
+      
+      {/* Issue Detail Modal */}
+      {selectedIssue && (
+        <IssueDetailModal
+          issue={selectedIssue}
+          currentUser={currentUser}
+          onClose={() => setSelectedIssue(null)}
+          onUpdate={(updatedIssue) => {
+            setIncidents(prev => prev.map(i => i.id === updatedIssue.id ? updatedIssue : i));
+            setSelectedIssue(null);
+            if (refreshIncidents) refreshIncidents();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -781,7 +1376,7 @@ function KanbanView({ incidents, setIncidents, filters, setFilters, refreshIncid
 // ----------------------------------------------------------------------
 // 6. KANBAN CARD (Updated for Real Data with AI Analysis Preview)
 // ----------------------------------------------------------------------
-function KanbanCard({ id, title, severity, location, createdAt, status, incidentId, onStatusChange, setMessage }) {
+function KanbanCard({ id, title, severity, location, createdAt, status, incidentId, incident, onStatusChange, setMessage, onClick }) {
   const [expanded, setExpanded] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [loadingAI, setLoadingAI] = useState(false);
@@ -886,8 +1481,21 @@ function KanbanCard({ id, title, severity, location, createdAt, status, incident
            Severity: {severity}/5
          </span>
          <div className="flex gap-1">
+           {onClick && (
+             <button
+               onClick={(e) => {
+                 e.stopPropagation();
+                 onClick();
+               }}
+               className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded hover:bg-green-200 transition-colors font-medium"
+               title="View full details"
+             >
+               👁️ View
+             </button>
+           )}
            <button
-             onClick={() => {
+             onClick={(e) => {
+               e.stopPropagation();
                setExpanded(!expanded);
                if (!expanded && !aiAnalysis) loadAIAnalysis();
              }}
@@ -988,13 +1596,39 @@ function IoTView() {
 
 // 8. MAP VIEW - Enhanced Admin Map with More Data
 // -----------------------------------------------------------------------
-function MapView({ incidents = [], refreshIncidents }) {
+function MapView({ incidents = [], refreshIncidents, currentUser, emergencyMode, setEmergencyMode, showAlerts, setShowAlerts, showAssignPanel, setShowAssignPanel }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [severityFilter, setSeverityFilter] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showClusters, setShowClusters] = useState(true);
   const [selectedIncident, setSelectedIncident] = useState(null);
+  const [selectedIssue, setSelectedIssue] = useState(null);
+  const [fullUserProfile, setFullUserProfile] = useState(null);
+  
+  // Fetch full user profile with role information
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (!currentUser) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', currentUser.id)
+          .single();
+        
+        if (error) throw error;
+        setFullUserProfile(data);
+      } catch (err) {
+        console.error('Error fetching user profile:', err);
+        // Fallback to currentUser if fetch fails
+        setFullUserProfile(currentUser);
+      }
+    };
+    
+    fetchUserProfile();
+  }, [currentUser]);
 
   // Ensure the parent data is fresh when filters change (fixes stale addresses in 'All' view)
   useEffect(() => {
@@ -1208,12 +1842,132 @@ function MapView({ incidents = [], refreshIncidents }) {
               <div className="text-xs font-bold text-white">LIVE SYNC</div>
             </div>
             <div className="bg-slate-800/95 backdrop-blur rounded-lg shadow-lg border border-slate-700 p-2 flex gap-2">
-              <button className="text-[10px] bg-slate-700 text-white px-2.5 py-1.5 rounded hover:bg-slate-600 font-medium transition">🔔 Alerts</button>
-              <button className="text-[10px] bg-slate-700 text-white px-2.5 py-1.5 rounded hover:bg-slate-600 font-medium transition">👥 Assign</button>
-              <button className="text-[10px] bg-red-600 text-white px-2.5 py-1.5 rounded hover:bg-red-700 font-medium transition">🚨 Emergency</button>
+              <button 
+                onClick={() => setShowAlerts(!showAlerts)}
+                className={`text-[10px] ${showAlerts ? 'bg-orange-600' : 'bg-slate-700'} text-white px-2.5 py-1.5 rounded hover:bg-slate-600 font-medium transition`}
+              >
+                🔔 Alerts {showAlerts && `(${incidents.filter(i => i.severity >= 4 && i.status !== 'RESOLVED').length})`}
+              </button>
+              <button 
+                onClick={() => setShowAssignPanel(!showAssignPanel)}
+                className={`text-[10px] ${showAssignPanel ? 'bg-blue-600' : 'bg-slate-700'} text-white px-2.5 py-1.5 rounded hover:bg-slate-600 font-medium transition`}
+              >
+                👥 Assign {showAssignPanel && `(${incidents.filter(i => !i.assigned_to && i.status !== 'RESOLVED').length})`}
+              </button>
+              <button 
+                onClick={() => setEmergencyMode(!emergencyMode)}
+                className={`text-[10px] ${emergencyMode ? 'bg-red-700 animate-pulse' : 'bg-red-600'} text-white px-2.5 py-1.5 rounded hover:bg-red-700 font-medium transition`}
+              >
+                🚨 Emergency {emergencyMode && 'ON'}
+              </button>
             </div>
           </div>
+          
+          {/* Alerts Panel - Critical Issues */}
+          {showAlerts && (
+            <div className="absolute top-16 left-4 bg-white/98 backdrop-blur rounded-lg shadow-2xl border border-orange-300 w-80 max-h-96 overflow-y-auto z-50">
+              <div className="sticky top-0 bg-gradient-to-r from-orange-600 to-red-600 text-white px-4 py-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🚨</span>
+                  <h3 className="font-bold text-sm">Critical Alerts</h3>
+                </div>
+                <button onClick={() => setShowAlerts(false)} className="hover:bg-white/20 rounded p-1">×</button>
+              </div>
+              <div className="p-3 space-y-2">
+                {incidents.filter(i => i.severity >= 4 && i.status !== 'RESOLVED' && i.status !== 'CLOSED').length === 0 ? (
+                  <div className="text-center py-6 text-gray-500 text-sm">
+                    ✅ No critical alerts
+                  </div>
+                ) : (
+                  incidents
+                    .filter(i => i.severity >= 4 && i.status !== 'RESOLVED' && i.status !== 'CLOSED')
+                    .slice(0, 10)
+                    .map(incident => (
+                      <div 
+                        key={incident.id}
+                        onClick={() => {
+                          setSelectedIssue(incident);
+                          setShowAlerts(false);
+                        }}
+                        className="bg-red-50 border border-red-200 rounded p-2 cursor-pointer hover:shadow-md transition"
+                      >
+                        <div className="flex justify-between items-start">
+                          <span className="font-bold text-xs text-red-700">#{incident.id.toString().slice(-4)} {incident.category}</span>
+                          <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded font-bold">SEV {incident.severity}</span>
+                        </div>
+                        <div className="text-[10px] text-gray-600 mt-1 truncate">📍 {incident.address || 'Location unavailable'}</div>
+                        <div className="text-[9px] text-gray-500 mt-1">
+                          {incident.assigned_to ? '👤 Assigned' : '⚠️ Unassigned'} • {new Date(incident.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
+          )}
+          
+          {/* Assign Panel - Unassigned Issues */}
+          {showAssignPanel && (
+            <div className="absolute top-16 left-4 bg-white/98 backdrop-blur rounded-lg shadow-2xl border border-blue-300 w-80 max-h-96 overflow-y-auto z-50">
+              <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">👥</span>
+                  <h3 className="font-bold text-sm">Unassigned Issues</h3>
+                </div>
+                <button onClick={() => setShowAssignPanel(false)} className="hover:bg-white/20 rounded p-1">×</button>
+              </div>
+              <div className="p-3 space-y-2">
+                {incidents.filter(i => !i.assigned_to && i.status !== 'RESOLVED' && i.status !== 'CLOSED').length === 0 ? (
+                  <div className="text-center py-6 text-gray-500 text-sm">
+                    ✅ All issues assigned
+                  </div>
+                ) : (
+                  incidents
+                    .filter(i => !i.assigned_to && i.status !== 'RESOLVED' && i.status !== 'CLOSED')
+                    .slice(0, 10)
+                    .map(incident => (
+                      <div 
+                        key={incident.id}
+                        onClick={() => {
+                          setSelectedIssue(incident);
+                          setShowAssignPanel(false);
+                        }}
+                        className="bg-blue-50 border border-blue-200 rounded p-2 cursor-pointer hover:shadow-md transition"
+                      >
+                        <div className="flex justify-between items-start">
+                          <span className="font-bold text-xs text-blue-700">#{incident.id.toString().slice(-4)} {incident.category}</span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                            incident.severity >= 4 ? 'bg-red-100 text-red-700' : 
+                            incident.severity === 3 ? 'bg-yellow-100 text-yellow-700' : 
+                            'bg-blue-100 text-blue-700'
+                          }`}>
+                            SEV {incident.severity}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-gray-600 mt-1 truncate">📍 {incident.address || 'Location unavailable'}</div>
+                        <div className="text-[9px] text-gray-500 mt-1">
+                          Status: {incident.status || 'OPEN'} • {new Date(incident.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
+          )}
        </div>
+       
+       {/* Issue Detail Modal */}
+       {selectedIssue && (
+         <IssueDetailModal
+           issue={selectedIssue}
+           currentUser={fullUserProfile}
+           onClose={() => setSelectedIssue(null)}
+           onUpdate={(updatedIssue) => {
+             setSelectedIssue(null);
+             if (refreshIncidents) refreshIncidents();
+           }}
+         />
+       )}
     </div>
   );
 }

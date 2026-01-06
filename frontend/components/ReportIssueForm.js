@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase, storageHelpers } from '../lib/supabase'
 import MapComponent from './MapComponent'
+import { BENGALURU_WARDS, getZones } from '../lib/bengaluru_wards'
 
 const CATEGORIES = [
   { value: 'Pothole', label: 'Pothole', icon: '🕳️' },
@@ -488,19 +489,39 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
             )}
           </div>
           
-          {/* Ward Number (Optional) */}
+          {/* Ward Selection (Required) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Ward Number (Optional)
+              Ward Number <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
+            <select
               value={formData.ward_number}
               onChange={(e) => setFormData({ ...formData, ward_number: e.target.value })}
-              placeholder="e.g., Ward 44"
+              required
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <p className="text-xs text-gray-500 mt-1">If you know the ward number, enter it here</p>
+            >
+              <option value="">Select Your Ward</option>
+              {getZones().map(zone => (
+                <optgroup key={zone} label={`${zone} Zone`}>
+                  {BENGALURU_WARDS.filter(w => w.zone === zone).map(ward => (
+                    <option key={ward.number} value={`Ward ${ward.number}`}>
+                      Ward {ward.number} - {ward.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Select the ward where the issue is located. 
+              <a 
+                href="https://bbmp.gov.in/ward-details" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline ml-1"
+              >
+                Find your ward →
+              </a>
+            </p>
           </div>
 
           {/* Submit Button */}
@@ -516,7 +537,7 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
             <button
               type="submit"
               className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading || !formData.latitude}
+              disabled={loading || !formData.latitude || !formData.ward_number}
             >
               {loading ? 'Submitting...' : 'Submit Report'}
             </button>
