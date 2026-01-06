@@ -50,7 +50,7 @@ export default function Dashboard() {
   const stats = useMemo(() => {
     const openCount = incidents.filter(i => i.status === 'OPEN' || !i.status).length;
     const inProgressCount = incidents.filter(i => i.status === 'IN_PROGRESS').length;
-    const resolvedCount = incidents.filter(i => i.status === 'RESOLVED' || i.status === 'CLOSED').length;
+    const resolvedCount = incidents.filter(i => { const s = (i.status || '').toUpperCase(); return s === 'RESOLVED' || s === 'CLOSED'; }).length;
     const resolutionRate = incidents.length > 0 ? Math.round((resolvedCount / incidents.length) * 100) : 0;
     
     const categories = incidents.reduce((acc, i) => {

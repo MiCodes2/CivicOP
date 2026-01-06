@@ -52,77 +52,53 @@ export default function Home() {
   useEffect(() => {
     fetchIncidents();
     
-    // Set up real-time subscription
-    const sub1 = supabase
-      .channel('civic_issues_changes')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'civic_issues' 
-      }, (payload) => {
-        console.log('Real-time update (civic_issues):', payload);
-        const parseIncident = (inc) => ({
-          ...inc,
-          latitude: inc.latitude != null ? parseFloat(inc.latitude) : null,
-          longitude: inc.longitude != null ? parseFloat(inc.longitude) : null,
-        });
-        if (payload.eventType === 'INSERT') {
-          setIncidents(prev => [parseIncident(payload.new), ...prev]);
-        } else if (payload.eventType === 'UPDATE') {
-          // Normalize payload and compare IDs as strings to avoid type mismatch between number/string
-          const updated = parseIncident(payload.new);
-          setIncidents(prev => prev.map(inc => String(inc.id) === String(updated.id) ? updated : inc));
-        } else if (payload.eventType === 'DELETE') {
-          setIncidents(prev => prev.filter(inc => String(inc.id) !== String(payload.old.id)));
-        }
-      })
-      .subscribe();
-
-    let sub2 = null;
-    import('../lib/supabase_helpers').then(({ tableExists }) => {
-      tableExists('incidents').then(available => {
-        if (!available) return
-        sub2 = supabase
-          .channel('incidents_changes')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, (payload) => {
-            console.log('Real-time update (incidents):', payload);
-            if (payload.eventType === 'INSERT') {
-              setIncidents(prev => [payload.new, ...prev]);
-            } else if (payload.eventType === 'UPDATE') {
-              setIncidents(prev => prev.map(inc => inc.id === payload.new.id ? payload.new : inc));
-            } else if (payload.eventType === 'DELETE') {
-              setIncidents(prev => prev.filter(inc => inc.id !== payload.old.id));
-            }
-          })
-          .subscribe()
-      })
-    })
-
+    // DISABLED: Realtime subscriptions were causing stale data issues
+    // Old cached data from the subscription would overwrite fresh fetches
+    // Using polling instead (see below)
+    
     return () => {
-      sub1.unsubscribe();
-      if (sub2) sub2.unsubscribe();
+      // No cleanup needed without subscription
     };
+  }, []);
+
+  // Poll for updates every 30 seconds instead of using realtime subscriptions
+  // This prevents stale cached data from overwriting fresh fetches
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      fetchIncidents();
+    }, 30000);
+
+    return () => clearInterval(pollInterval);
   }, []);
 
   const fetchIncidents = async () => {
     try {
-      // Force fresh data - add timestamp to bypass any caching
-      const timestamp = new Date().getTime();
-      const { data, error } = await supabase
-        .from('civic_issues')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100)
-        .throwOnError();
-
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
+      // Force fresh data with cache-busting headers to get latest from primary DB
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/civic_issues?select=*&order=created_at.desc&limit=100&apikey=${supabaseKey}`,
+        {
+          method: 'GET',
+          headers: {
+            'apikey': supabaseKey,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation',
+            'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+            'Pragma': 'no-cache',
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
-      console.log('Fetched incidents:', data?.length, 'at', new Date().toISOString());
+      const data = await response.json();
+      
       // Parse lat/lng as floats to ensure proper filtering in Map component
-      const parsedData = (data || []).map(d => ({
+      const parsedData = (Array.isArray(data) ? data : []).map(d => ({
         ...d,
         latitude: d.latitude != null ? parseFloat(d.latitude) : null,
         longitude: d.longitude != null ? parseFloat(d.longitude) : null,
@@ -164,7 +140,7 @@ export default function Home() {
   // Calculate stats
   const openCount = incidents.filter(i => i.status === 'OPEN' || !i.status).length;
   const inProgressCount = incidents.filter(i => i.status === 'IN_PROGRESS').length;
-  const resolvedCount = incidents.filter(i => i.status === 'RESOLVED' || i.status === 'CLOSED').length;
+  const resolvedCount = incidents.filter(i => { const s = (i.status || '').toUpperCase(); return s === 'RESOLVED' || s === 'CLOSED'; }).length;
   const criticalCount = incidents.filter(i => i.severity >= 4).length;
 
   return (

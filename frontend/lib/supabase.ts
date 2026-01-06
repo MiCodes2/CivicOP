@@ -56,19 +56,8 @@ export const dbHelpers = {
   // Incidents (prefer 'civic_issues' if available, else fallback to 'incidents')
   async getIncidents(limit = 100) {
     // prefer civic_issues
-    try {
-      const { data, error } = await supabase
-        .from('civic_issues')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(limit)
-      if (!error) return data
-    } catch (e) {
-      console.debug('getIncidents: civic_issues read failed, trying incidents', e)
-    }
-    // fallback
     const { data, error } = await supabase
-      .from('incidents')
+      .from('civic_issues')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(limit)
@@ -77,19 +66,8 @@ export const dbHelpers = {
   },
 
   async getIncidentById(id: string) {
-    try {
-      const { data, error } = await supabase
-        .from('civic_issues')
-        .select('*')
-        .eq('id', id)
-        .single()
-      if (!error) return data
-    } catch (e) {
-      console.debug('getIncidentById: civic_issues read failed, trying incidents', e)
-    }
-
     const { data, error } = await supabase
-      .from('incidents')
+      .from('civic_issues')
       .select('*')
       .eq('id', id)
       .single()
@@ -98,18 +76,8 @@ export const dbHelpers = {
   },
 
   async createIncident(incident: any) {
-    try {
-      const { data, error } = await supabase
-        .from('civic_issues')
-        .insert([incident])
-        .select()
-      if (!error) return data
-    } catch (e) {
-      console.debug('createIncident: civic_issues insert failed, trying incidents', e)
-    }
-
     const { data, error } = await supabase
-      .from('incidents')
+      .from('civic_issues')
       .insert([incident])
       .select()
     if (error) throw error
@@ -133,28 +101,16 @@ export const dbHelpers = {
     return data
   },
 
-  // Real-time subscriptions (try both tables, but do not fail if one is missing)
+  // Real-time subscriptions to civic_issues table
   subscribeToIncidents(callback: (payload: any) => void) {
-    const sub1 = supabase
+    const sub = supabase
       .channel('civic_issues-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'civic_issues' }, callback)
       .subscribe()
 
-    let sub2: any = null
-    // try to subscribe to incidents table but ignore failures
-    try {
-      sub2 = supabase
-        .channel('incidents-changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, callback)
-        .subscribe()
-    } catch (err) {
-      console.debug('subscribeToIncidents: incidents subscription failed (table may not exist)', err)
-    }
-
     return {
       unsubscribe() {
-        sub1.unsubscribe()
-        if (sub2) sub2.unsubscribe()
+        sub.unsubscribe()
       }
     }
   },

@@ -295,7 +295,7 @@ function DashboardView({ incidents = [], loading = false }) {
   // Derive comprehensive stats from shared incidents
   const openCount = incidents.filter(i => i.status === 'OPEN' || !i.status).length;
   const inProgressCount = incidents.filter(i => i.status === 'IN_PROGRESS').length;
-  const resolvedCount = incidents.filter(i => i.status === 'RESOLVED' || i.status === 'CLOSED').length;
+  const resolvedCount = incidents.filter(i => { const s = (i.status || '').toUpperCase(); return s === 'RESOLVED' || s === 'CLOSED'; }).length;
   
   // Additional admin-only insights
   const criticalCount = incidents.filter(i => i.severity >= 4).length;
@@ -456,8 +456,10 @@ function DashboardView({ incidents = [], loading = false }) {
              ) : (
                latestIncidents.map((incident) => {
                  const severity = incident.severity || 3;
+                 // Normalize status for consistent, case-insensitive checks
+                 const status = (incident.status || 'OPEN').toUpperCase();
                  const getColors = () => {
-                   if (incident.status === 'RESOLVED') return { border: 'border-l-green-500', bg: 'bg-green-50/20', color: 'text-green-700' };
+                   if (status === 'RESOLVED') return { border: 'border-l-green-500', bg: 'bg-green-50/20', color: 'text-green-700' };
                    if (severity >= 4) return { border: 'border-l-red-500', bg: 'bg-red-50/10', color: 'text-red-700' };
                    if (severity === 3) return { border: 'border-l-yellow-500', bg: 'bg-yellow-50/10', color: 'text-yellow-700' };
                    return { border: 'border-l-blue-500', bg: 'bg-blue-50/10', color: 'text-blue-700' };
@@ -470,18 +472,18 @@ function DashboardView({ incidents = [], loading = false }) {
                    <div key={incident.id} className={`p-2.5 border-b border-gray-100 hover:bg-blue-50/30 transition-colors border-l-4 ${colors.border} ${colors.bg} cursor-pointer`}>
                       <div className="flex justify-between items-start">
                           <div className={`font-bold text-xs ${colors.color}`}>
-                            {incident.status === 'RESOLVED' ? '✅' : severity >= 4 ? '🔴' : severity === 3 ? '🟡' : '🔵'} #{incident.id.toString().slice(-4)} {incident.category || 'Issue'}
+                            {status === 'RESOLVED' ? '✅' : severity >= 4 ? '🔴' : severity === 3 ? '🟡' : '🔵'} #{incident.id.toString().slice(-4)} {incident.category || 'Issue'}
                           </div>
                           <div className="text-[10px] text-gray-400 font-mono">{timeStr}</div>
                       </div>
                       <div className="text-[10px] text-gray-500 mt-0.5 truncate">📍 {incident.address || `${incident.latitude?.toFixed(4)}, ${incident.longitude?.toFixed(4)}`}</div>
                       <div className="mt-1.5 flex items-center gap-2">
                           <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
-                            incident.status === 'RESOLVED' ? 'bg-green-100 text-green-700' :
-                            incident.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-700' :
+                            status === 'RESOLVED' ? 'bg-green-100 text-green-700' :
+                            status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-700' :
                             'bg-orange-100 text-orange-700'
                           }`}>
-                            {incident.status || 'OPEN'}
+                            {status || 'OPEN'}
                           </span>
                           <span className="text-[9px] text-gray-500">Sev: {severity}/5</span>
                           {incident.assigned_to && <span className="text-[9px] text-purple-600">👤 Assigned</span>}
@@ -567,7 +569,7 @@ function KanbanView({ incidents, setIncidents, filters, setFilters, refreshIncid
   // Group filtered incidents by status (counts update automatically when incidents change)
   const openIncidents = filteredIncidents.filter(i => i.status === 'OPEN' || !i.status);
   const inProgressIncidents = filteredIncidents.filter(i => i.status === 'IN_PROGRESS');
-  const resolvedIncidents = filteredIncidents.filter(i => i.status === 'RESOLVED' || i.status === 'CLOSED');
+  const resolvedIncidents = filteredIncidents.filter(i => { const s = (i.status || '').toUpperCase(); return s === 'RESOLVED' || s === 'CLOSED'; });
 
   return (
     <div className="h-full flex flex-col space-y-3">
@@ -986,13 +988,20 @@ function IoTView() {
 
 // 8. MAP VIEW - Enhanced Admin Map with More Data
 // -----------------------------------------------------------------------
-function MapView({ incidents = [] }) {
+function MapView({ incidents = [], refreshIncidents }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [severityFilter, setSeverityFilter] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showClusters, setShowClusters] = useState(true);
   const [selectedIncident, setSelectedIncident] = useState(null);
+
+  // Ensure the parent data is fresh when filters change (fixes stale addresses in 'All' view)
+  useEffect(() => {
+    if (typeof refreshIncidents === 'function' && statusFilter === 'all') {
+      refreshIncidents();
+    }
+  }, [statusFilter, refreshIncidents]);
 
   // Filter incidents based on admin selections
   const filteredIncidents = useMemo(() => {
@@ -1014,7 +1023,7 @@ function MapView({ incidents = [] }) {
   // Calculate admin-only stats
   const openCount = incidents.filter(i => i.status === 'OPEN' || !i.status).length;
   const inProgressCount = incidents.filter(i => i.status === 'IN_PROGRESS').length;
-  const resolvedCount = incidents.filter(i => i.status === 'RESOLVED' || i.status === 'CLOSED').length;
+  const resolvedCount = incidents.filter(i => { const s = (i.status || '').toUpperCase(); return s === 'RESOLVED' || s === 'CLOSED'; }).length;
   const criticalCount = incidents.filter(i => i.severity >= 4).length;
   const resolutionRate = incidents.length > 0 ? Math.round((resolvedCount / incidents.length) * 100) : 0;
   

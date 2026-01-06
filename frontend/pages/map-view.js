@@ -9,52 +9,89 @@ export default function MapView() {
   const [incidents, setIncidents] = useState([]);
   const [userLocation, setUserLocation] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('active'); // Default to active (excludes resolved)
   const [showLegend, setShowLegend] = useState(true);
+  const [lastFetchAt, setLastFetchAt] = useState(null);
 
   useEffect(() => {
     fetchIncidents();
     
-    const subscription = supabase
-      .channel('civic_issues_mapview')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'civic_issues' }, (payload) => {
-        const normalize = (row) => ({ ...row, latitude: row.latitude != null ? parseFloat(row.latitude) : null, longitude: row.longitude != null ? parseFloat(row.longitude) : null });
-        if (payload.eventType === 'INSERT') {
-          setIncidents(prev => [normalize(payload.new), ...prev]);
-        } else if (payload.eventType === 'UPDATE') {
-          const updated = normalize(payload.new);
-          setIncidents(prev => prev.map(inc => String(inc.id) === String(updated.id) ? updated : inc));
-        } else if (payload.eventType === 'DELETE') {
-          setIncidents(prev => prev.filter(inc => String(inc.id) !== String(payload.old.id)));
-        }
-      })
-      .subscribe();
-
-    return () => { subscription.unsubscribe(); };
+    // DISABLED: Realtime subscriptions were causing stale data to overwrite fresh fetches
+    // The 'UPDATE' events in the subscription carried old cached data from Supabase
+    // and would overwrite the results of manual fetchIncidents() calls
+    // Solution: Use manual fetches + polling instead (see below)
+    
+    // DO NOT re-enable this subscription without adding timestamp-based deduplication
+    // or switching to a debounced fetch-on-change approach
+    
+    return () => { 
+      // No cleanup needed without subscription
+    };
   }, []);
 
   const fetchIncidents = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('civic_issues')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (error) throw error;
+      const fetchTime = new Date().toISOString();
+      
+      // CRITICAL: Use direct Supabase REST API with headers to force primary DB read
+      // The Supabase JS client may be caching results, so bypass it entirely
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/civic_issues?select=*&order=created_at.desc&limit=100&apikey=${supabaseKey}`,
+        {
+          method: 'GET',
+          headers: {
+            'apikey': supabaseKey,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation',
+            'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+            'Pragma': 'no-cache',
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
       const parsed = (Array.isArray(data) ? data : []).map(d => ({
         ...d,
         latitude: d.latitude != null ? parseFloat(d.latitude) : null,
         longitude: d.longitude != null ? parseFloat(d.longitude) : null,
       }));
+      
       setIncidents(parsed);
+      setLastFetchAt(fetchTime);
     } catch (error) {
-      console.error('Error fetching incidents:', error);
+      console.error(`❌ [${new Date().toLocaleTimeString()}] Error fetching incidents:`, error);
+      setIncidents([]);
     } finally {
       setLoading(false);
     }
   };
+
+  // Re-sync with server when status filter changes to ensure latest DB state
+  useEffect(() => {
+    // Force hard refresh: clear state first, then fetch fresh from server
+    // This prevents stale cached data from appearing
+    setIncidents([]);
+    fetchIncidents();
+  }, [statusFilter]);
+
+  // Periodic polling every 30 seconds to catch updates (replaces realtime subscription)
+  // Reduced from 5s to prevent excessive map redrawing and keep UX smooth
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      fetchIncidents();
+    }, 30000);
+
+    return () => clearInterval(pollInterval);
+  }, []);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -70,7 +107,7 @@ export default function MapView() {
   // Helper to set coordinates/address for an incident (useful for unmapped resolved items)
   const setIncidentCoords = async (id, lat, lng, addr) => {
     // Optimistically update local state so popups and markers reflect change immediately
-    setIncidents(prev => prev.map(i => (String(i.id) === String(id) ? { ...i, latitude: parseFloat(lat), longitude: parseFloat(lng), address: addr } : i)));
+    setIncidents(prev => prev.map(i => (String(i.id) === String(id) ? { ...i, latitude: parseFloat(lat), longitude: parseFloat(lng), address: addr, updated_at: new Date().toISOString() } : i)));
 
     try {
       const { data, error } = await supabase
@@ -83,8 +120,11 @@ export default function MapView() {
         throw error;
       }
 
-      // Ensure canonical server state
-      await fetchIncidents();
+      // Wait 500ms for Supabase connection pool to catch up, then hard refetch
+      // This prevents realtime/cache from returning stale data on the next SELECT
+      setTimeout(async () => {
+        await fetchIncidents();
+      }, 500);
 
       // Minor UX: notify user
       window.alert(`Updated incident ${id} to ${addr} (${lat}, ${lng})`);
@@ -112,14 +152,26 @@ export default function MapView() {
   }, [incidents]);
 
   const filteredIncidents = useMemo(() => {
-    if (statusFilter === 'all') return incidents;
+    // 'active' = OPEN + IN_PROGRESS only (default view, hides resolved)
+    // 'all' = shows ALL incidents including resolved
+    // 'open' = OPEN only
+    // 'in_progress' = IN_PROGRESS only
+    // 'resolved' = RESOLVED + CLOSED only
+    if (statusFilter === 'active') return incidents.filter(i => !['RESOLVED', 'CLOSED'].includes((i.status || '').toUpperCase()));
+    if (statusFilter === 'all') return incidents; // Show ALL including resolved
     if (statusFilter === 'open') return incidents.filter(i => (i.status || 'OPEN').toUpperCase() === 'OPEN');
     if (statusFilter === 'in_progress') return incidents.filter(i => (i.status || '').toUpperCase() === 'IN_PROGRESS');
     if (statusFilter === 'resolved') return incidents.filter(i => ['RESOLVED', 'CLOSED'].includes((i.status || '').toUpperCase()));
     return incidents;
   }, [incidents, statusFilter]);
 
+  // Calculate active count for filter button
+  const activeCount = useMemo(() => {
+    return incidents.filter(i => !['RESOLVED', 'CLOSED'].includes((i.status || '').toUpperCase())).length;
+  }, [incidents]);
+
   const filterButtons = [
+    { key: 'active', label: 'Active', count: activeCount, color: 'bg-purple-600' },
     { key: 'all', label: 'All', count: incidents.length, color: 'bg-gray-600' },
     { key: 'open', label: 'Open', count: stats.openCount, color: 'bg-orange-500' },
     { key: 'in_progress', label: 'In Progress', count: stats.inProgressCount, color: 'bg-blue-500' },
@@ -298,25 +350,28 @@ export default function MapView() {
         </div>
       </div>
 
-      {/* Mobile Bottom Bar */}
+      {/* Mobile Bottom Bar - Compact stats only */}
       <div className="md:hidden absolute bottom-4 left-4 right-4 z-40">
-        <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg p-3">
-          <div className="grid grid-cols-4 gap-2 text-center">
-            <div className="p-2">
-              <div className="text-lg font-bold text-gray-900">{incidents.length}</div>
-              <div className="text-[9px] text-gray-500">Total</div>
+        <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2">
+          <div className="flex items-center justify-around text-center">
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-bold text-gray-900">{incidents.length}</span>
+              <span className="text-[10px] text-gray-500">Total</span>
             </div>
-            <div className="p-2">
-              <div className="text-lg font-bold text-orange-600">{stats.openCount}</div>
-              <div className="text-[9px] text-gray-500">Open</div>
+            <div className="w-px h-4 bg-gray-200"></div>
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-bold text-orange-600">{stats.openCount}</span>
+              <span className="text-[10px] text-gray-500">Open</span>
             </div>
-            <div className="p-2">
-              <div className="text-lg font-bold text-blue-600">{stats.inProgressCount}</div>
-              <div className="text-[9px] text-gray-500">Progress</div>
+            <div className="w-px h-4 bg-gray-200"></div>
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-bold text-blue-600">{stats.inProgressCount}</span>
+              <span className="text-[10px] text-gray-500">WIP</span>
             </div>
-            <div className="p-2">
-              <div className="text-lg font-bold text-green-600">{stats.resolvedCount}</div>
-              <div className="text-[9px] text-gray-500">Resolved</div>
+            <div className="w-px h-4 bg-gray-200"></div>
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-bold text-green-600">{stats.resolvedCount}</span>
+              <span className="text-[10px] text-gray-500">Done</span>
             </div>
           </div>
         </div>
