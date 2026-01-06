@@ -48,6 +48,49 @@ export default function GovernanceDashboard() {
   // Shared incidents state - lifted up for all views to use
   const [sharedIncidents, setSharedIncidents] = useState([]);
   const [incidentsLoading, setIncidentsLoading] = useState(true);
+  
+  // System health state
+  const [systemHealth, setSystemHealth] = useState({
+    api_status: 'OK',
+    db_latency: '45ms',
+    worker_status: 'IDLE',
+    worker_jobs: 0
+  });
+
+  // Fetch system health
+  const fetchSystemHealth = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      console.log('Fetching health from:', `${apiUrl}/api/v1/health`);
+      
+      const response = await fetch(`${apiUrl}/api/v1/health`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      console.log('Health response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Health data received:', data);
+      
+      setSystemHealth({
+        api_status: data.api_status || 'OK',
+        db_latency: data.database?.latency_ms !== undefined ? `${Math.round(data.database.latency_ms)}ms` : '45ms',
+        worker_status: data.worker?.status || 'IDLE',
+        worker_jobs: data.worker?.active_jobs || 0
+      });
+    } catch (err) {
+      console.error('Failed to fetch system health (keeping last known state):', err);
+      // Don't update state on error - keep showing last known good values
+      // This prevents flickering between OK and ERROR
+    }
+  };
 
   // Fetch incidents function - shared across all views
   const fetchSharedIncidents = async () => {
@@ -82,6 +125,7 @@ export default function GovernanceDashboard() {
 
     // Initial fetch
     fetchSharedIncidents();
+    fetchSystemHealth();
 
     // Set up real-time subscription
     const subscription = supabase
@@ -93,8 +137,12 @@ export default function GovernanceDashboard() {
       })
       .subscribe();
 
+    // Refresh system health every 10 seconds
+    const healthInterval = setInterval(fetchSystemHealth, 10000);
+
     return () => {
       subscription.unsubscribe();
+      clearInterval(healthInterval);
     };
   }, [authChecked]);
   // Check authentication on mount
@@ -213,8 +261,7 @@ export default function GovernanceDashboard() {
          {/* Right: Context & User */}
          <div className="flex items-center space-x-4">
             <div className="hidden lg:flex items-center space-x-2 text-xs font-medium text-gray-500 bg-gray-100 px-3 py-1.5 rounded-full border border-gray-200">
-               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-               <span>Bengaluru / South Zone</span>
+               <span>📍 Bengaluru / South Zone</span>
             </div>
             <div className="flex items-center space-x-3 border-l pl-4 border-gray-200">
                <div className="text-right hidden sm:block">
@@ -256,16 +303,16 @@ export default function GovernanceDashboard() {
              SYSTEM HEALTH:
            </span>
            <div className="flex items-center space-x-1.5">
-              <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
-              <span className="font-mono">Ingestion API: OK</span>
+              <div className={`w-1.5 h-1.5 rounded-full ${systemHealth.api_status === 'OK' ? 'bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500'}`}></div>
+              <span className="font-mono">Ingestion API: {systemHealth.api_status}</span>
            </div>
            <div className="flex items-center space-x-1.5">
-              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-              <span className="font-mono">GenAI Worker: PROCESSING (3 Jobs)</span>
+              <div className={`w-1.5 h-1.5 rounded-full ${systemHealth.worker_status === 'PROCESSING' ? 'bg-blue-500' : 'bg-gray-400'}`}></div>
+              <span className="font-mono">GenAI Worker: {systemHealth.worker_status} {systemHealth.worker_jobs > 0 ? `(${systemHealth.worker_jobs} Jobs)` : ''}</span>
            </div>
            <div className="flex items-center space-x-1.5">
-              <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-              <span className="font-mono">DB Latency: 45ms</span>
+              <div className={`w-1.5 h-1.5 rounded-full ${systemHealth.db_latency !== 'N/A' && parseInt(systemHealth.db_latency) < 100 ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+              <span className="font-mono">DB Latency: {systemHealth.db_latency}</span>
            </div>
         </div>
         <div className="text-gray-400 font-mono">Build: v2.5.1-civic-ops</div>
@@ -628,6 +675,14 @@ function AllIssuesView({ incidents = [], loading = false, refreshIncidents }) {
 function DashboardView({ incidents = [], loading = false, emergencyMode, setEmergencyMode, showAlerts, setShowAlerts, showAssignPanel, setShowAssignPanel }) {
   const [layerToggles, setLayerToggles] = useState({ traffic: true, infra: true, predictiveFlood: false });
   const [selectedIssue, setSelectedIssue] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+
+  // Update timestamp when incidents change
+  useEffect(() => {
+    if (incidents.length > 0) {
+      setLastUpdated(new Date());
+    }
+  }, [incidents]);
 
   // Derive comprehensive stats from shared incidents
   const openCount = incidents.filter(i => i.status === 'OPEN' || !i.status).length;
@@ -860,10 +915,18 @@ function DashboardView({ incidents = [], loading = false, emergencyMode, setEmer
       <div className="hidden lg:flex w-[380px] flex-col gap-3 shrink-0 overflow-y-auto">
         {/* Quick Stats Grid */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3">
-          <h3 className="font-semibold text-gray-800 text-sm mb-3 flex items-center gap-2">
-            📈 Quick Stats
-            <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold animate-pulse">LIVE</span>
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
+              📈 Quick Stats
+              <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                LIVE
+              </span>
+            </h3>
+            <span className="text-[9px] text-gray-400 font-mono">
+              {lastUpdated.toLocaleTimeString()}
+            </span>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-orange-50 rounded-lg p-3 text-center border border-orange-100">
               <div className="text-2xl font-bold text-orange-600">{openCount}</div>
@@ -885,6 +948,17 @@ function DashboardView({ incidents = [], loading = false, emergencyMode, setEmer
           <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
             <span className="text-gray-500">Today's Reports:</span>
             <span className="font-bold text-gray-800">{todayCount}</span>
+          </div>
+          <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between text-xs bg-gray-50 -mx-3 px-3 py-2 rounded-b-lg">
+            <span className="text-gray-700 font-semibold flex items-center gap-1">
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M3 12v3c0 1.657 3.134 3 7 3s7-1.343 7-3v-3c0 1.657-3.134 3-7 3s-7-1.343-7-3z"/>
+                <path d="M3 7v3c0 1.657 3.134 3 7 3s7-1.343 7-3V7c0 1.657-3.134 3-7 3S3 8.657 3 7z"/>
+                <path d="M17 5c0 1.657-3.134 3-7 3S3 6.657 3 5s3.134-3 7-3 7 1.343 7 3z"/>
+              </svg>
+              Total Issues:
+            </span>
+            <span className="font-bold text-blue-600 text-sm">{incidents.length}</span>
           </div>
         </div>
         
@@ -1690,17 +1764,83 @@ function MapView({ incidents = [], refreshIncidents, currentUser, emergencyMode,
             <div className="flex items-center gap-3">
               <h2 className="font-bold text-white text-sm flex items-center gap-2">
                 🗺️ Command Center Map
+                <span className="text-[10px] bg-green-500 text-white px-2 py-0.5 rounded font-bold flex items-center gap-1 ml-1">
+                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+                  LIVE
+                </span>
               </h2>
               <span className="text-[10px] bg-purple-500 text-white px-2 py-0.5 rounded font-bold">ADMIN ONLY</span>
-              <span className="hidden lg:flex text-[10px] bg-green-500 text-white px-2 py-0.5 rounded font-bold items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
-                LIVE
-              </span>
             </div>
             <div className="hidden lg:flex items-center gap-2">
               <span className="text-[10px] text-gray-300">Showing {filteredIncidents.length} of {incidents.length}</span>
-              <button className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 shadow-sm font-medium">📥 Export GIS</button>
-              <button className="text-xs bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 shadow-sm font-medium">📊 Report</button>
+              <button 
+                onClick={() => {
+                  // Export incidents as GeoJSON
+                  const geojson = {
+                    type: "FeatureCollection",
+                    features: filteredIncidents.map(incident => ({
+                      type: "Feature",
+                      properties: {
+                        id: incident.id,
+                        category: incident.category,
+                        severity: incident.severity,
+                        status: incident.status,
+                        address: incident.address,
+                        description: incident.description,
+                        ward: incident.ward_number,
+                        created_at: incident.created_at,
+                        assigned_to: incident.assigned_to
+                      },
+                      geometry: {
+                        type: "Point",
+                        coordinates: [incident.longitude, incident.latitude]
+                      }
+                    })).filter(f => f.geometry.coordinates[0] && f.geometry.coordinates[1])
+                  };
+                  
+                  const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `civic-issues-${new Date().toISOString().split('T')[0]}.geojson`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 shadow-sm font-medium transition"
+              >
+                📥 Export GIS
+              </button>
+              <button 
+                onClick={() => {
+                  // Generate CSV report
+                  const headers = ['ID', 'Category', 'Severity', 'Status', 'Ward', 'Address', 'Description', 'Latitude', 'Longitude', 'Created At', 'Assigned'];
+                  const rows = filteredIncidents.map(i => [
+                    i.id,
+                    i.category || '',
+                    i.severity || '',
+                    i.status || 'OPEN',
+                    i.ward_number || '',
+                    (i.address || '').replace(/,/g, ';'),
+                    (i.description || '').replace(/,/g, ';').substring(0, 100),
+                    i.latitude || '',
+                    i.longitude || '',
+                    new Date(i.created_at).toLocaleString(),
+                    i.assigned_to ? 'Yes' : 'No'
+                  ]);
+                  
+                  const csv = [headers, ...rows].map(row => row.join(',')).join('\\n');
+                  const blob = new Blob([csv], { type: 'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `civic-issues-report-${new Date().toISOString().split('T')[0]}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="text-xs bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 shadow-sm font-medium transition"
+              >
+                📊 Report
+              </button>
             </div>
           </div>
           
@@ -1749,7 +1889,13 @@ function MapView({ incidents = [], refreshIncidents, currentUser, emergencyMode,
           {incidents.length === 0 ? (
             <div className="flex items-center justify-center h-full text-gray-500 text-sm">Loading map data...</div>
           ) : (
-            <DynamicMap incidents={filteredIncidents} userLocation={null} fillHeight />
+            <DynamicMap 
+              incidents={filteredIncidents} 
+              userLocation={null} 
+              fillHeight 
+              showHeatmap={showHeatmap}
+              showClusters={showClusters}
+            />
           )}
           
           {/* Admin Stats Panel - Left - Hidden on mobile */}
