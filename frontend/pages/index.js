@@ -296,9 +296,16 @@ export default function Home() {
                                 <span className="text-[10px] text-gray-500 truncate max-w-[120px]">
                                   📍 {incident.address || `${incident.latitude?.toFixed(3)}, ${incident.longitude?.toFixed(3)}`}
                                 </span>
-                                <span className="text-[10px] text-gray-400">
-                                  {new Date(incident.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                                </span>
+                                <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                                  <span title="Created">
+                                    🕐 {new Date(incident.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                  </span>
+                                  {incident.resolved_at && (
+                                    <span title="Resolution Time" className="text-green-600 font-medium">
+                                      ✅ {Math.round((new Date(incident.resolved_at) - new Date(incident.created_at)) / (1000 * 60 * 60))}h
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>

@@ -8,6 +8,53 @@ import IssueDetailModal from '../components/IssueDetailModal';
 import { BENGALURU_WARDS, getZones } from '../lib/bengaluru_wards';
 
 // ----------------------------------------------------------------------
+// HELPER COMPONENT: Assigned To Cell
+// ----------------------------------------------------------------------
+function AssignedToCell({ userId }) {
+  const [userName, setUserName] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
+    const fetchUser = async () => {
+      try {
+        const { data, error } = await dbHelpers.getUserById(userId);
+        if (!error && data) {
+          setUserName(data.full_name || data.email?.split('@')[0] || 'User');
+        }
+      } catch (err) {
+        console.error('Error fetching user:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUser();
+  }, [userId]);
+
+  if (loading) {
+    return <span className="text-xs text-gray-400">Loading...</span>;
+  }
+
+  if (!userName) {
+    return <span className="text-xs text-gray-400 italic">Unassigned</span>;
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-xs font-bold text-blue-700">
+        {userName[0]?.toUpperCase()}
+      </div>
+      <span className="text-xs text-gray-700 font-medium">{userName}</span>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------
 // 1. DYNAMIC MAP LOADING
 // ----------------------------------------------------------------------
 const DynamicMap = dynamic(() => import('../components/Map'), {
@@ -417,12 +464,17 @@ function AllIssuesView({ incidents = [], loading = false, refreshIncidents }) {
     if (currentUser) {
       if (currentUser.role === 'ward_admin' && currentUser.assigned_wards?.length > 0) {
         result = result.filter(i => {
-          const wardNum = i.ward_number_parsed || parseInt(i.ward_number?.match(/\d+/)?.[0]);
+          // Extract ward number more robustly
+          const wardStr = i.ward_number || '';
+          const wardMatch = wardStr.match(/\d+/);
+          const wardNum = wardMatch ? parseInt(wardMatch[0]) : null;
           return wardNum && currentUser.assigned_wards.includes(wardNum);
         });
       } else if (currentUser.role === 'ward_executive_engineer') {
+        // Engineers see only issues assigned to them
         result = result.filter(i => i.assigned_to === currentUser.id);
       }
+      // Admins see everything - no filter needed
     }
 
     // Sort
@@ -575,6 +627,7 @@ function AllIssuesView({ incidents = [], loading = false, refreshIncidents }) {
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Category</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Description</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Ward</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Assigned To</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Severity</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Created</th>
@@ -613,6 +666,13 @@ function AllIssuesView({ incidents = [], loading = false, refreshIncidents }) {
                     <span className="text-sm text-gray-600">
                       {issue.ward_number || 'N/A'}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {issue.assigned_to ? (
+                      <AssignedToCell userId={issue.assigned_to} />
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">Unassigned</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {getStatusBadge(issue.status)}
