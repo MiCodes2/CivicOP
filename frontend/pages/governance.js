@@ -772,7 +772,7 @@ function DashboardView({ incidents = [], loading = false, emergencyMode, setEmer
   }, {});
   const topCategories = Object.entries(categoryBreakdown)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
+    .slice(0, 12);
   
   // Resolution rate
   const resolutionRate = incidents.length > 0 
@@ -1892,7 +1892,7 @@ function MapView({ incidents = [], refreshIncidents, currentUser, emergencyMode,
   const categories = Object.keys(categoryBreakdown);
   const topCategories = Object.entries(categoryBreakdown)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
+    .slice(0, 12);
 
   // Ward breakdown for admin
   const wardBreakdown = incidents.reduce((acc, i) => {

@@ -357,7 +357,7 @@ export default function Home() {
                           acc[cat] = (acc[cat] || 0) + 1;
                           return acc;
                         }, {})
-                      ).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([cat, count]) => (
+                      ).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([cat, count]) => (
                         <div key={cat} className="flex items-center justify-between">
                           <span className="text-xs text-gray-700 capitalize">{cat}</span>
                           <div className="flex items-center gap-2">

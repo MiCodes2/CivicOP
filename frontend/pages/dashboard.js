@@ -328,7 +328,7 @@ export default function Dashboard() {
                 <div className="bg-white rounded-xl shadow-sm border p-5">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4">📊 Issues by Category</h3>
                   <div className="space-y-3">
-                    {Object.entries(stats.categories).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([cat, count], idx) => {
+                    {Object.entries(stats.categories).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([cat, count], idx) => {
                       const colors = ['bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-orange-500', 'bg-pink-500', 'bg-cyan-500'];
                       return (
                         <div key={cat} className="flex items-center gap-3">
