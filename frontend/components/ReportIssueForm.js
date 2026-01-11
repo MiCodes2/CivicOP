@@ -22,6 +22,12 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
     longitude: initialLocation?.longitude || null,
     address: '',
     ward_number: '',
+    // ISO string compatible with <input type="datetime-local"> value (no seconds)
+    created_at_local: (() => {
+      const d = new Date()
+      const pad = (n) => n.toString().padStart(2, '0')
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    })(),
   })
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
@@ -183,6 +189,17 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
         throw new Error('\u274c Location must be within Bengaluru city limits. Please select a valid location using the map or address search.')
       }
 
+      // Validate post date is not in the future
+      let createdAtValue = null
+      if (formData.created_at_local) {
+        const selected = new Date(formData.created_at_local)
+        const now = new Date()
+        if (selected > now) {
+          throw new Error('Post date cannot be in the future')
+        }
+        createdAtValue = selected.toISOString()
+      }
+
       let imageUrl = null
 
       // Upload image if provided
@@ -221,7 +238,9 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
           image_url: imageUrl,
           address: formData.address || null,
           ward_number: formData.ward_number || null,
-          status: 'OPEN'
+          status: 'OPEN',
+          // Allow backdating by setting created_at if provided
+          ...(createdAtValue ? { created_at: createdAtValue } : {})
         }])
         .select()
 
@@ -242,6 +261,11 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
         longitude: null,
         address: '',
         ward_number: '',
+        created_at_local: (() => {
+          const d = new Date()
+          const pad = (n) => n.toString().padStart(2, '0')
+          return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+        })(),
       })
       setImageFile(null)
       setImagePreview(null)
@@ -270,6 +294,7 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
             </div>
             <p className="text-xs text-blue-700 font-medium mt-2">📍 Bengaluru City Only - This is a pilot program currently live in Bengaluru</p>
           </div>
+
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 transition flex-shrink-0"
@@ -380,6 +405,24 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
                 </button>
               ))}
             </div>
+
+          {/* Post Date (allows backdating) - moved above Title */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Post Date (you may select a past date/time)
+            </label>
+            <input
+              type="datetime-local"
+              value={formData.created_at_local}
+              max={(() => {
+                const d = new Date();
+                const pad = (n) => n.toString().padStart(2, '0')
+                return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+              })()}
+              onChange={(e) => setFormData({ ...formData, created_at_local: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 mt-1">Select a past date/time to post the report in back-dates. Future dates are not allowed.</p>
           </div>
 
           {/* Title */}
@@ -398,6 +441,7 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
           </div>
 
           {/* Description */}
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Description *

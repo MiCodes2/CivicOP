@@ -103,6 +103,8 @@ export default function Home() {
         latitude: d.latitude != null ? parseFloat(d.latitude) : null,
         longitude: d.longitude != null ? parseFloat(d.longitude) : null,
       }));
+      // Ensure incidents are sorted by created_at descending (server requests already do this, but keep client-side safeguard)
+      parsedData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       setIncidents(parsedData);
     } catch (error) {
       console.error('Error fetching incidents:', error);
@@ -281,6 +283,12 @@ export default function Home() {
                               </div>
                             )}
                             <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-2 mb-1 text-[11px] text-gray-500">
+                                      <div className="truncate">🕐 {new Date(incident.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</div>
+                                      {incident.resolved_at && (
+                                        <span className="text-green-600 font-medium">✅ {Math.round((new Date(incident.resolved_at) - new Date(incident.created_at)) / (1000 * 60 * 60))}h</span>
+                                      )}
+                                    </div>
                               <div className="flex items-center justify-between gap-2">
                                 <h4 className="text-sm font-semibold text-gray-900 truncate">
                                   {incident.category || 'Issue'}
@@ -292,21 +300,11 @@ export default function Home() {
                               <p className="text-xs text-gray-600 mt-0.5 line-clamp-1">
                                 {incident.description || 'No description'}
                               </p>
-                              <div className="flex items-center justify-between mt-1.5">
-                                <span className="text-[10px] text-gray-500 truncate max-w-[120px]">
-                                  📍 {incident.address || `${incident.latitude?.toFixed(3)}, ${incident.longitude?.toFixed(3)}`}
-                                </span>
-                                <div className="flex items-center gap-2 text-[10px] text-gray-400">
-                                  <span title="Created">
-                                    🕐 {new Date(incident.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                                  </span>
-                                  {incident.resolved_at && (
-                                    <span title="Resolution Time" className="text-green-600 font-medium">
-                                      ✅ {Math.round((new Date(incident.resolved_at) - new Date(incident.created_at)) / (1000 * 60 * 60))}h
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
+                                    <div className="flex items-center justify-between mt-1.5">
+                                      <span className="text-[10px] text-gray-500 truncate max-w-[120px]">
+                                        📍 {incident.address || `${incident.latitude?.toFixed(3)}, ${incident.longitude?.toFixed(3)}`}
+                                      </span>
+                                    </div>
                             </div>
                           </div>
                         </div>

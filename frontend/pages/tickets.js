@@ -238,6 +238,12 @@ export default function Tickets() {
                     <div className="flex items-start gap-3">
                       <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 text-xl">{catIcons[ticket.category] || '📍'}</div>
                       <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 mb-1 text-[11px] text-gray-500">
+                          <div className="truncate">🕐 {new Date(ticket.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+                          {ticket.resolved_at && (
+                            <div className="text-green-600 font-medium">✅ {new Date(ticket.resolved_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2">
                           <h3 className="font-semibold text-gray-900 truncate">{ticket.category || 'Issue'}</h3>
                           {!ticket.image_url && (
@@ -258,24 +264,7 @@ export default function Tickets() {
                       </span>
                     </div>
                     <div className="mt-3 space-y-2">
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span className="flex items-center gap-1">
-                          <span title="Created">🕐</span>
-                          {new Date(ticket.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        {ticket.ward_number && <span className="text-purple-600">Ward {ticket.ward_number}</span>}
-                      </div>
-                      {ticket.resolved_at && (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="flex items-center gap-1 text-green-600">
-                            <span title="Resolved">✅</span>
-                            {new Date(ticket.resolved_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          <span className="text-green-600 font-semibold" title="Resolution Time">
-                            ⚡ {Math.round((new Date(ticket.resolved_at) - new Date(ticket.created_at)) / (1000 * 60 * 60))}h
-                          </span>
-                        </div>
-                      )}
+                      {ticket.ward_number && <div className="text-xs text-purple-600">Ward {ticket.ward_number}</div>}
                     </div>
                   </div>
                 </div>
