@@ -150,6 +150,23 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
     }
   }
 
+  // Validate image URLs. Accepts direct extensions or `format=` query param (e.g. Twitter CDN links)
+  const isValidImageUrl = (link) => {
+    if (!link) return false
+    try {
+      const parsed = new URL(link)
+      const pathname = parsed.pathname || ''
+      const ext = pathname.split('.').pop().toLowerCase()
+      const allowed = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp']
+      if (allowed.includes(ext)) return true
+      const fmt = parsed.searchParams.get('format')
+      if (fmt && allowed.includes(fmt.toLowerCase())) return true
+      return false
+    } catch (e) {
+      return false
+    }
+  }
+
   const handleLocationClick = () => {
     if (navigator.geolocation) {
       setLoading(true)
@@ -219,9 +236,9 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
       // Use external image URL if provided (saves Supabase storage)
       if (formData.external_image_url && formData.external_image_url.trim()) {
         const link = formData.external_image_url.trim()
-        // basic image url validation
-        if (!/^https?:\/\/.+\.(jpg|jpeg|png|webp|gif|bmp)(\?.*)?$/i.test(link)) {
-          throw new Error('Please provide a valid image URL ending with jpg/png/webp/gif')
+        // basic image url validation (allow format= query param for CDNs like Twitter)
+        if (!isValidImageUrl(link)) {
+          throw new Error('Please provide a valid image URL ending with jpg/png/webp/gif (or use ?format=jpg)')
         }
         imageUrl = link
       } else if (imageFile) {
