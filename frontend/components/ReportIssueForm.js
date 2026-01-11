@@ -22,6 +22,7 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
     longitude: initialLocation?.longitude || null,
     address: '',
     ward_number: '',
+    external_image_url: '',
     // ISO string compatible with <input type="datetime-local"> value (no seconds)
     created_at_local: (() => {
       const d = new Date()
@@ -136,6 +137,18 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
     }
   }
 
+  const handleImageLinkChange = (e) => {
+    const url = e.target.value
+    setFormData(prev => ({ ...prev, external_image_url: url }))
+    // If the user provides a link, clear any selected file and show preview
+    if (url && url.trim()) {
+      setImageFile(null)
+      setImagePreview(url)
+    } else if (!url) {
+      setImagePreview(null)
+    }
+  }
+
   const handleLocationClick = () => {
     if (navigator.geolocation) {
       setLoading(true)
@@ -202,8 +215,15 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
 
       let imageUrl = null
 
-      // Upload image if provided
-      if (imageFile) {
+      // Use external image URL if provided (saves Supabase storage)
+      if (formData.external_image_url && formData.external_image_url.trim()) {
+        const link = formData.external_image_url.trim()
+        // basic image url validation
+        if (!/^https?:\/\/.+\.(jpg|jpeg|png|webp|gif|bmp)(\?.*)?$/i.test(link)) {
+          throw new Error('Please provide a valid image URL ending with jpg/png/webp/gif')
+        }
+        imageUrl = link
+      } else if (imageFile) {
         const fileExt = imageFile.name.split('.').pop()
         const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`
         const filePath = `public/${fileName}`
@@ -381,6 +401,18 @@ export default function ReportIssueForm({ onClose, onSuccess, initialLocation })
               </div>
             )}
             <p className="text-xs text-gray-500 mt-2 text-center">PNG, JPG, WEBP up to 5MB</p>
+            {/* External Image Link */}
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Or add image from URL (Optional)</label>
+              <input
+                type="url"
+                placeholder="https://example.com/photo.jpg"
+                value={formData.external_image_url}
+                onChange={handleImageLinkChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">Providing an external image link will avoid uploading to Supabase storage.</p>
+            </div>
           </div>
 
           {/* Category */}
