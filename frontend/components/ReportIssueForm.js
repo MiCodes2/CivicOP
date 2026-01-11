@@ -7,6 +7,7 @@ const CATEGORIES = [
   { value: 'Pothole', label: 'Pothole', icon: '🕳️' },
   { value: 'Garbage', label: 'Garbage', icon: '🗑️' },
   { value: 'Streetlight', label: 'Streetlight', icon: '💡' },
+  { value: 'Footpath', label: 'Footpath', icon: '🚶‍♀️' },
   { value: 'Water Leak', label: 'Water Leak', icon: '💧' },
   { value: 'Road Damage', label: 'Road Damage', icon: '🚧' },
   { value: 'Other', label: 'Other', icon: '📝' },
