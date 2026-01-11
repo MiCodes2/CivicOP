@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -52,12 +52,15 @@ def get_incident(incident_id: int, db: Session = Depends(get_db)):
     return incident
 
 @router.get("/", response_model=List[IncidentResponse])
-def get_incidents(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_incidents(skip: int = 0, limit: Optional[int] = None, db: Session = Depends(get_db)):
     """
     Get all incidents.
     """
     # Use select to include latitude and longitude
-    stmt = select(Incident).where(Incident.gps_location.isnot(None)).offset(skip).limit(limit)
+    stmt = select(Incident).where(Incident.gps_location.isnot(None)).offset(skip)
+    # Apply limit only when explicitly provided (None = no limit)
+    if limit is not None:
+        stmt = stmt.limit(limit)
     
     result = db.execute(stmt).scalars().all()
     

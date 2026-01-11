@@ -55,8 +55,7 @@ export default function Tickets() {
       const { data, error: fetchError } = await supabase
         .from('civic_issues')
         .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
+        .order('created_at', { ascending: false });
 
       if (fetchError) throw fetchError;
       setTickets(data || []);

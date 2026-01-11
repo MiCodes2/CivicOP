@@ -18,11 +18,111 @@ const ReportIssueForm = dynamic(() => import('../components/ReportIssueForm'), {
 
 import CameraOverlay from '../components/CameraOverlay';
 
-const _CAT_ICONS = { 'pothole': '🕳️', 'garbage': '🗑️', 'streetlight': '💡', 'water leak': '💧', 'road damage': '🚧', 'other': '📍' };
 const catIcons = (cat) => {
-  if (!cat) return _CAT_ICONS['other']
-  const key = String(cat).trim().toLowerCase()
-  return _CAT_ICONS[key] || _CAT_ICONS[Object.keys(_CAT_ICONS).find(k => key.includes(k))] || _CAT_ICONS['other']
+  const key = (cat || 'other').toString().trim().toLowerCase();
+
+  if (key.includes('foot') || key.includes('path')) {
+    return (
+      <svg className="w-5 h-5 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 12h18" />
+        <path d="M6 12v6a2 2 0 002 2h8a2 2 0 002-2v-6" />
+      </svg>
+    );
+  }
+
+  if (key.includes('drain')) {
+    return (
+      <svg className="w-5 h-5 text-teal-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 20h16" />
+        <path d="M8 16v-6a4 4 0 018 0v6" />
+      </svg>
+    );
+  }
+
+  if (key.includes('water') || key.includes('leak') || key.includes('supply')) {
+    return (
+      <svg className="w-5 h-5 text-cyan-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 3s4 4 4 7a4 4 0 11-8 0c0-3 4-7 4-7z" />
+      </svg>
+    );
+  }
+
+  if (key.includes('road') || key.includes('damage') || key.includes('carriage')) {
+    return (
+      <svg className="w-5 h-5 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 13l4-8 4 8 4-8 4 8" />
+        <path d="M2 20h20" />
+      </svg>
+    );
+  }
+
+  if (key.includes('streetlight') || key.includes('light')) {
+    return (
+      <svg className="w-5 h-5 text-yellow-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 3a4 4 0 00-4 4c0 1.657 1.343 3 3 3h2c1.657 0 3-1.343 3-3a4 4 0 00-4-4z" />
+        <path d="M12 13v6" />
+        <path d="M10 21h4" />
+      </svg>
+    );
+  }
+
+  if (key.includes('pothole') || key.includes('poth')) {
+    return (
+      <svg className="w-5 h-5 text-cyan-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="6" />
+        <circle cx="12" cy="12" r="2" fill="currentColor" />
+      </svg>
+    );
+  }
+
+  if (key.includes('garbage') || key.includes('trash') || key.includes('dustbin')) {
+    return (
+      <svg className="w-5 h-5 text-purple-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 6h18" />
+        <path d="M8 6v12a2 2 0 002 2h4a2 2 0 002-2V6" />
+        <path d="M10 6V4a2 2 0 012-2h0a2 2 0 012 2v2" />
+      </svg>
+    );
+  }
+
+  if (key.includes('sanitation') || key.includes('toilet') || key.includes('sewer')) {
+    return (
+      <svg className="w-5 h-5 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2a5 5 0 00-5 5v7a5 5 0 0010 0V7a5 5 0 00-5-5z" />
+        <path d="M9 21h6" />
+      </svg>
+    );
+  }
+
+  if (key.includes('traffic') || key.includes('signal')) {
+    return (
+      <svg className="w-5 h-5 text-pink-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <rect x="8" y="3" width="8" height="14" rx="2" />
+        <circle cx="12" cy="7" r="1" />
+        <circle cx="12" cy="12" r="1" />
+        <circle cx="12" cy="17" r="1" />
+      </svg>
+    );
+  }
+
+  if (key.includes('infrastructure')) {
+    return (
+      <svg className="w-5 h-5 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 3v18h18" />
+        <rect x="7" y="12" width="3" height="6" />
+        <rect x="12" y="8" width="3" height="10" />
+        <rect x="17" y="4" width="3" height="14" />
+      </svg>
+    );
+  }
+
+  // Default / Other
+  return (
+    <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2a7 7 0 00-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 00-7-7z" />
+      <circle cx="12" cy="9" r="2" />
+    </svg>
+  );
 }
 
 export default function Home() {
@@ -331,22 +431,49 @@ export default function Home() {
                   {/* Status Summary */}
                   <div>
                     <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Issue Status</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="bg-orange-50 rounded-lg p-3 text-center border border-orange-100">
-                        <div className="text-2xl font-bold text-orange-600">{openCount}</div>
-                        <div className="text-[10px] text-orange-700 font-medium">Open</div>
+                    <div className="grid grid-cols-2 gap-1">
+                      <div className="bg-orange-50 rounded-lg p-2 text-center border border-orange-100 flex flex-col items-center justify-center">
+                        <div className="flex items-center justify-center mb-1">
+                          <svg className="w-5 h-5 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            <path d="M12 9v4" />
+                            <path d="M12 17h.01" />
+                          </svg>
+                        </div>
+                        <div className="text-xl font-semibold text-orange-600">{openCount}</div>
+                        <div className="text-xs text-orange-700">Open</div>
                       </div>
-                      <div className="bg-blue-50 rounded-lg p-3 text-center border border-blue-100">
-                        <div className="text-2xl font-bold text-blue-600">{inProgressCount}</div>
-                        <div className="text-[10px] text-blue-700 font-medium">In Progress</div>
+                      <div className="bg-blue-50 rounded-lg p-2 text-center border border-blue-100 flex flex-col items-center justify-center">
+                        <div className="flex items-center justify-center mb-1">
+                          <svg className="w-5 h-5 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 3v4" />
+                            <path d="M10 3v4" />
+                            <path d="M5 13l4 4 10-10" />
+                          </svg>
+                        </div>
+                        <div className="text-xl font-semibold text-blue-600">{inProgressCount}</div>
+                        <div className="text-xs text-blue-700">In Progress</div>
                       </div>
-                      <div className="bg-green-50 rounded-lg p-3 text-center border border-green-100">
-                        <div className="text-2xl font-bold text-green-600">{resolvedCount}</div>
-                        <div className="text-[10px] text-green-700 font-medium">Resolved</div>
+                      <div className="bg-green-50 rounded-lg p-2 text-center border border-green-100 flex flex-col items-center justify-center">
+                        <div className="flex items-center justify-center mb-1">
+                          <svg className="w-5 h-5 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M20 6L9 17l-5-5" />
+                          </svg>
+                        </div>
+                        <div className="text-xl font-semibold text-green-600">{resolvedCount}</div>
+                        <div className="text-xs text-green-700">Resolved</div>
                       </div>
-                      <div className="bg-gray-50 rounded-lg p-3 text-center border border-gray-200">
-                        <div className="text-2xl font-bold text-gray-700">{incidents.length}</div>
-                        <div className="text-[10px] text-gray-600 font-medium">Total</div>
+                      <div className="bg-gray-50 rounded-lg p-2 text-center border border-gray-200 flex flex-col items-center justify-center">
+                        <div className="flex items-center justify-center mb-1">
+                          <svg className="w-5 h-5 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 3v18h18" />
+                            <rect x="7" y="12" width="3" height="6" />
+                            <rect x="12" y="8" width="3" height="10" />
+                            <rect x="17" y="4" width="3" height="14" />
+                          </svg>
+                        </div>
+                        <div className="text-xl font-semibold text-gray-700">{incidents.length}</div>
+                        <div className="text-xs text-gray-600">Total</div>
                       </div>
                     </div>
                   </div>
@@ -362,16 +489,27 @@ export default function Home() {
                           return acc;
                         }, {})
                       ).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([cat, count]) => (
-                        <div key={cat} className="flex items-center justify-between">
-                          <span className="text-xs text-gray-700 capitalize">{cat}</span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-16 bg-gray-100 rounded-full h-1.5">
-                              <div 
-                                className="bg-blue-500 h-1.5 rounded-full" 
-                                style={{width: `${Math.min((count / incidents.length) * 100, 100)}%`}}
+                        <div key={cat} className="flex items-center gap-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-7 h-7 rounded-md bg-gray-50 flex items-center justify-center shrink-0">
+                              <div className="w-4 h-4">
+                                {catIcons(cat)}
+                              </div>
+                            </div>
+                            <span className="text-xs text-gray-700 truncate capitalize">{cat}</span>
+                          </div>
+
+                          <div className="flex-1 mx-2">
+                            <div className="w-full bg-gray-100 rounded-full h-1.5">
+                              <div
+                                className="bg-blue-500 h-1.5 rounded-full"
+                                style={{ width: `${Math.min((count / incidents.length) * 100, 100)}%` }}
                               ></div>
                             </div>
-                            <span className="text-xs font-bold text-gray-700 w-5 text-right">{count}</span>
+                          </div>
+
+                          <div className="w-6 text-right">
+                            <span className="text-xs font-semibold text-gray-700">{count}</span>
                           </div>
                         </div>
                       ))}

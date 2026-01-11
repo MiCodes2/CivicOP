@@ -40,7 +40,7 @@ export default function MapView() {
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
       
       const response = await fetch(
-        `${supabaseUrl}/rest/v1/civic_issues?select=*&order=created_at.desc&limit=100&apikey=${supabaseKey}`,
+        `${supabaseUrl}/rest/v1/civic_issues?select=*&order=created_at.desc&apikey=${supabaseKey}`,
         {
           method: 'GET',
           headers: {
