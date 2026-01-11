@@ -18,6 +18,13 @@ const ReportIssueForm = dynamic(() => import('../components/ReportIssueForm'), {
 
 import CameraOverlay from '../components/CameraOverlay';
 
+const _CAT_ICONS = { 'pothole': '🕳️', 'garbage': '🗑️', 'streetlight': '💡', 'water leak': '💧', 'road damage': '🚧', 'other': '📍' };
+const catIcons = (cat) => {
+  if (!cat) return _CAT_ICONS['other']
+  const key = String(cat).trim().toLowerCase()
+  return _CAT_ICONS[key] || _CAT_ICONS[Object.keys(_CAT_ICONS).find(k => key.includes(k))] || _CAT_ICONS['other']
+}
+
 export default function Home() {
   const router = useRouter();
   const [incidents, setIncidents] = useState([]);
@@ -276,11 +283,8 @@ export default function Home() {
                               />
                             ) : (
                               <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-xl">
-                                {incident.category === 'Pothole' ? '🕳️' :
-                                 incident.category === 'Garbage' ? '🗑️' :
-                                 incident.category === 'Streetlight' ? '💡' :
-                                 incident.category === 'Water Leak' ? '💧' : '📍'}
-                              </div>
+                                  {catIcons(incident.category)}
+                                </div>
                             )}
                             <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between gap-2 mb-1 text-[11px] text-gray-500">

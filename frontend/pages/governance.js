@@ -294,11 +294,11 @@ export default function GovernanceDashboard() {
 
             {/* Top Navigation Tabs */}
             <nav className="flex space-x-1 ml-2 md:ml-4">
-               <NavTab label="Dashboard" icon="📊" active={activeNav === 'dashboard'} onClick={() => setActiveNav('dashboard')} />
-               <NavTab label="All Issues" icon="📋" active={activeNav === 'all-issues'} onClick={() => setActiveNav('all-issues')} />
-               <NavTab label="Map View" icon="🗺️" active={activeNav === 'map'} onClick={() => setActiveNav('map')} />
-               <NavTab label="Workflow Triage" icon="🎫" active={activeNav === 'tickets' || activeNav === 'ai'} onClick={() => setActiveNav('tickets')} />
-               <NavTab label="IoT" icon="📡" active={activeNav === 'iot'} onClick={() => setActiveNav('iot')} />
+              <NavTab label="Dashboard" icon="📊" active={activeNav === 'dashboard'} onClick={() => setActiveNav('dashboard')} />
+              <NavTab label="All Issues" icon="📋" active={activeNav === 'all-issues'} onClick={() => setActiveNav('all-issues')} />
+              <NavTab label="Map View" icon="🗺️" active={activeNav === 'map'} onClick={() => setActiveNav('map')} />
+              <NavTab label="Workflow Triage" icon="🎫" active={activeNav === 'tickets' || activeNav === 'ai'} onClick={() => setActiveNav('tickets')} />
+              <NavTab label="IoT" icon="📡" active={activeNav === 'iot'} onClick={() => setActiveNav('iot')} />
             </nav>
 
             {/* Prominent page title placed to the right of the tabs */}
@@ -310,8 +310,8 @@ export default function GovernanceDashboard() {
          {/* Right: Context & User */}
          <div className="flex items-center space-x-4">
             <div className="hidden lg:flex items-center space-x-2 text-xs font-medium text-gray-500 bg-gray-100 px-3 py-1.5 rounded-full border border-gray-200">
-               <span>📍 Bengaluru / South Zone</span>
-            </div>
+            <span className="inline-flex items-center gap-1"><PinIcon className="w-3 h-3 text-gray-500"/> Bengaluru / South Zone</span>
+          </div>
             <div className="flex items-center space-x-3 border-l pl-4 border-gray-200">
                <div className="text-right hidden sm:block">
                   <div className="text-sm font-bold text-gray-800">{currentUser?.full_name || currentUser?.email?.split('@')[0] || 'User'}</div>
@@ -393,6 +393,122 @@ function NavTab({ label, active, onClick, icon }) {
       <span className="hidden md:inline">{label}</span>
     </button>
   );
+}
+
+// ----------------------------------------------------------------------
+// ICON HELPERS
+// ----------------------------------------------------------------------
+function PinIcon({ className = 'w-4 h-4 text-gray-500' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2a7 7 0 00-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 00-7-7z" />
+      <circle cx="12" cy="9" r="2" />
+    </svg>
+  );
+}
+
+function UserIcon({ className = 'w-4 h-4 text-gray-500' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+function WarningIcon({ className = 'w-4 h-4 text-yellow-500' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
+    </svg>
+  );
+}
+
+function CheckIcon({ className = 'w-4 h-4 text-green-600' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  );
+}
+
+function ClipboardIcon({ className = 'w-5 h-5 text-gray-700' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="2" width="6" height="4" rx="1" />
+      <path d="M9 6v14a2 2 0 002 2h2a2 2 0 002-2V6" />
+    </svg>
+  );
+}
+
+function MapIcon({ className = 'w-5 h-5 text-gray-700' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6l7-3 7 3 7-3v13l-7 3-7-3-7 3V6z" />
+    </svg>
+  );
+}
+
+function StatsIcon({ className = 'w-5 h-5 text-gray-700' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 3v18h18" />
+      <rect x="7" y="12" width="3" height="6" />
+      <rect x="12" y="8" width="3" height="10" />
+      <rect x="17" y="4" width="3" height="14" />
+    </svg>
+  );
+}
+
+function IoTIcon({ className = 'w-5 h-5 text-gray-700' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2v6" />
+      <path d="M5 7v6a7 7 0 0014 0V7" />
+      <circle cx="12" cy="16" r="1" />
+    </svg>
+  );
+}
+
+function TicketIcon({ className = 'w-5 h-5 text-gray-700' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="10" rx="2" />
+      <path d="M7 7v10" />
+    </svg>
+  );
+}
+
+// Reuse dashboard-like category icon resolver
+function getCatIcon(category) {
+  const cat = (category || '').toString().trim();
+  const key = cat.toLowerCase();
+  if (!cat) return <PinIcon className="w-5 h-5 text-gray-500" />;
+  if (key.includes('pothole') || key.includes('poth')) return <svg className="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" fill="currentColor" /></svg>;
+  if (key.includes('garbage') || key.includes('trash')) return <svg className="w-5 h-5 text-purple-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6v12a2 2 0 002 2h4a2 2 0 002-2V6" /><path d="M10 6V4a2 2 0 012-2h0a2 2 0 012 2v2" /></svg>;
+  if (key.includes('streetlight') || key.includes('light')) return <svg className="w-5 h-5 text-yellow-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a4 4 0 00-4 4c0 1.657 1.343 3 3 3h2c1.657 0 3-1.343 3-3a4 4 0 00-4-4z" /><path d="M12 13v6" /><path d="M10 21h4" /></svg>;
+  if (key.includes('water') || key.includes('leak') || key.includes('supply')) return <svg className="w-5 h-5 text-cyan-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3s4 4 4 7a4 4 0 11-8 0c0-3 4-7 4-7z" /></svg>;
+  if (key.includes('road') || key.includes('damage')) return <svg className="w-5 h-5 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M3 13l4-8 4 8 4-8 4 8" /><path d="M2 20h20" /></svg>;
+  if (key.includes('drain')) return <svg className="w-5 h-5 text-teal-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16" /><path d="M8 16v-6a4 4 0 018 0v6" /></svg>;
+  if (key.includes('foot') || key.includes('path')) return <svg className="w-5 h-5 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h18" /><path d="M6 12v6a2 2 0 002 2h8a2 2 0 002-2v-6" /></svg>;
+  if (key.includes('sanitation') || key.includes('sewer')) return <svg className="w-5 h-5 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a5 5 0 00-5 5v7a5 5 0 0010 0V7a5 5 0 00-5-5z" /><path d="M9 21h6" /></svg>;
+  if (key.includes('traffic') || key.includes('signal')) return <svg className="w-5 h-5 text-pink-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="3" width="8" height="14" rx="2" /><circle cx="12" cy="7" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="17" r="1" /></svg>;
+  return <PinIcon className="w-5 h-5 text-gray-500" />;
+}
+
+function getStatusIcon(status) {
+  const s = (status || '').toUpperCase();
+  if (s === 'RESOLVED' || s === 'CLOSED') return <CheckIcon className="w-4 h-4 text-green-600 mr-1" />;
+  if (s === 'IN_PROGRESS') return <svg className="w-4 h-4 text-blue-600 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>;
+  return <svg className="w-4 h-4 text-orange-600 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v6" /><path d="M5 22h14" /></svg>;
+}
+
+function severityIcon(sev) {
+  if (sev >= 4) return <span className="inline-block w-2 h-2 rounded-full bg-red-600 mr-1" />;
+  if (sev === 3) return <span className="inline-block w-2 h-2 rounded-full bg-yellow-400 mr-1" />;
+  return <span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1" />;
 }
 
 // ----------------------------------------------------------------------
@@ -507,7 +623,7 @@ function AllIssuesView({ incidents = [], loading = false, refreshIncidents }) {
     const normalizedStatus = (status || 'OPEN').toUpperCase();
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-bold border ${statusColors[normalizedStatus] || statusColors['OPEN']}`}>
-        {normalizedStatus === 'RESOLVED' ? '✅ ' : normalizedStatus === 'IN_PROGRESS' ? '🔧 ' : ''}
+        <span className="inline-flex items-center mr-1">{getStatusIcon(normalizedStatus)}</span>
         {normalizedStatus}
       </span>
     );
@@ -614,10 +730,10 @@ function AllIssuesView({ incidents = [], loading = false, refreshIncidents }) {
         ) : filteredIncidents.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <div className="text-6xl mb-4">📋</div>
-              <p className="text-gray-600 font-medium">No issues found</p>
-              <p className="text-sm text-gray-500 mt-2">Try adjusting your filters</p>
-            </div>
+                <div className="text-6xl mb-4"><ClipboardIcon className="w-12 h-12 mx-auto text-gray-400" /></div>
+                <p className="text-gray-600 font-medium">No issues found</p>
+                <p className="text-sm text-gray-500 mt-2">Try adjusting your filters</p>
+              </div>
           </div>
         ) : (
           <table className="w-full">
@@ -648,12 +764,7 @@ function AllIssuesView({ incidents = [], loading = false, refreshIncidents }) {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">
-                        {issue.category === 'Pothole' ? '🕳️' :
-                         issue.category === 'Garbage' ? '🗑️' :
-                         issue.category === 'Streetlight' ? '💡' :
-                         issue.category === 'Water Leak' ? '💧' : '📍'}
-                      </span>
+                      <span className="text-lg">{getCatIcon(issue.category)}</span>
                       <span className="text-sm font-medium text-gray-900">{issue.category}</span>
                     </div>
                   </td>
@@ -864,13 +975,13 @@ function DashboardView({ incidents = [], loading = false, emergencyMode, setEmer
           
           {/* Floating Overlays - Admin-only detailed info */}
           <div className="absolute top-4 left-4 bg-white/95 backdrop-blur rounded-lg shadow-lg border border-gray-100 p-3 min-w-[160px]">
-             <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">🎯 Hotspot Cluster</div>
+             <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1 inline-flex items-center gap-2"><svg className="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4l2 2" /></svg>Hotspot Cluster</div>
              <div className="text-lg font-bold text-gray-800">Ward {topHotspotWard.ward}</div>
              <div className="text-[10px] text-gray-500 mt-1">{topHotspotWard.count} issues • {criticalCount} critical</div>
           </div>
           
           <div className="absolute top-4 right-4 bg-white/95 backdrop-blur rounded-lg shadow-lg border border-gray-100 p-3 min-w-[140px]">
-             <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">📊 Resolution Rate</div>
+             <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1 inline-flex items-center gap-2"><StatsIcon className="w-4 h-4 text-gray-500"/>Resolution Rate</div>
              <div className="text-lg font-bold text-green-600">{resolutionRate}%</div>
              <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
                <div className="bg-green-500 h-1.5 rounded-full transition-all duration-500" style={{width: `${resolutionRate}%`}}></div>
@@ -888,15 +999,15 @@ function DashboardView({ incidents = [], loading = false, emergencyMode, setEmer
             <div className="absolute top-16 right-4 bg-white/98 backdrop-blur rounded-lg shadow-2xl border border-orange-300 w-80 max-h-96 overflow-y-auto z-50">
               <div className="sticky top-0 bg-gradient-to-r from-orange-600 to-red-600 text-white px-4 py-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">🚨</span>
+                  <WarningIcon className="w-5 h-5 text-white" />
                   <h3 className="font-bold text-sm">Critical Alerts</h3>
                 </div>
                 <button onClick={() => setShowAlerts(false)} className="hover:bg-white/20 rounded p-1">×</button>
               </div>
               <div className="p-3 space-y-2">
                 {incidents.filter(i => i.severity >= 4 && i.status !== 'RESOLVED' && i.status !== 'CLOSED').length === 0 ? (
-                  <div className="text-center py-6 text-gray-500 text-sm">
-                    ✅ No critical alerts
+                  <div className="text-center py-6 text-gray-500 text-sm flex items-center justify-center gap-2">
+                    <CheckIcon className="w-4 h-4 text-green-600"/> <span>No critical alerts</span>
                   </div>
                 ) : (
                   incidents
@@ -915,9 +1026,10 @@ function DashboardView({ incidents = [], loading = false, emergencyMode, setEmer
                           <span className="font-bold text-xs text-red-700">#{incident.id.toString().slice(-4)} {incident.category}</span>
                           <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded font-bold">SEV {incident.severity}</span>
                         </div>
-                        <div className="text-[10px] text-gray-600 mt-1 truncate">📍 {incident.address || 'Location unavailable'}</div>
-                        <div className="text-[9px] text-gray-500 mt-1">
-                          {incident.assigned_to ? '👤 Assigned' : '⚠️ Unassigned'} • {new Date(incident.created_at).toLocaleDateString()}
+                        <div className="text-[10px] text-gray-600 mt-1 truncate inline-flex items-center gap-1"><PinIcon className="w-3 h-3 text-gray-400" />{incident.address || 'Location unavailable'}</div>
+                        <div className="text-[9px] text-gray-500 mt-1 inline-flex items-center gap-2">
+                          {incident.assigned_to ? (<span className="inline-flex items-center gap-1"><UserIcon className="w-3 h-3 text-gray-500"/> Assigned</span>) : (<span className="inline-flex items-center gap-1 text-yellow-700"><WarningIcon className="w-3 h-3 text-yellow-600"/> Unassigned</span>)}
+                          <span>• {new Date(incident.created_at).toLocaleDateString()}</span>
                         </div>
                       </div>
                     ))
@@ -939,7 +1051,7 @@ function DashboardView({ incidents = [], loading = false, emergencyMode, setEmer
               <div className="p-3 space-y-2">
                 {incidents.filter(i => !i.assigned_to && i.status !== 'RESOLVED' && i.status !== 'CLOSED').length === 0 ? (
                   <div className="text-center py-6 text-gray-500 text-sm">
-                    ✅ All issues assigned
+                    <span className="inline-flex items-center gap-2"><CheckIcon className="w-4 h-4 text-green-600"/> <span>All issues assigned</span></span>
                   </div>
                 ) : (
                   incidents
@@ -964,7 +1076,7 @@ function DashboardView({ incidents = [], loading = false, emergencyMode, setEmer
                             SEV {incident.severity}
                           </span>
                         </div>
-                        <div className="text-[10px] text-gray-600 mt-1 truncate">📍 {incident.address || 'Location unavailable'}</div>
+                        <div className="text-[10px] text-gray-600 mt-1 truncate inline-flex items-center gap-1"><PinIcon className="w-3 h-3 text-gray-400"/>{incident.address || 'Location unavailable'}</div>
                         <div className="text-[9px] text-gray-500 mt-1">
                           Status: {incident.status || 'OPEN'} • {new Date(incident.created_at).toLocaleDateString()}
                         </div>
@@ -1034,7 +1146,10 @@ function DashboardView({ incidents = [], loading = false, emergencyMode, setEmer
           <div className="space-y-2">
             {topCategories.map(([cat, count]) => (
               <div key={cat} className="flex items-center justify-between">
-                <span className="text-xs text-gray-600 capitalize">{cat}</span>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-sm">{getCatIcon(cat)}</div>
+                  <span className="text-xs text-gray-600 capitalize">{cat}</span>
+                </div>
                 <div className="flex items-center gap-2">
                   <div className="w-20 bg-gray-100 rounded-full h-1.5">
                     <div 
@@ -1079,11 +1194,11 @@ function DashboardView({ incidents = [], loading = false, emergencyMode, setEmer
                    <div key={incident.id} className={`p-2.5 border-b border-gray-100 hover:bg-blue-50/30 transition-colors border-l-4 ${colors.border} ${colors.bg} cursor-pointer`}>
                       <div className="flex justify-between items-start">
                           <div className={`font-bold text-xs ${colors.color}`}>
-                            {status === 'RESOLVED' ? '✅' : severity >= 4 ? '🔴' : severity === 3 ? '🟡' : '🔵'} #{incident.id.toString().slice(-4)} {incident.category || 'Issue'}
+                            {status === 'RESOLVED' ? <CheckIcon className="w-4 h-4 text-green-600 mr-1"/> : severityIcon(severity)} #{incident.id.toString().slice(-4)} {incident.category || 'Issue'}
                           </div>
                           <div className="text-[10px] text-gray-400 font-mono">{timeStr}</div>
                       </div>
-                      <div className="text-[10px] text-gray-500 mt-0.5 truncate">📍 {incident.address || `${incident.latitude?.toFixed(4)}, ${incident.longitude?.toFixed(4)}`}</div>
+                      <div className="text-[10px] text-gray-500 mt-0.5 truncate inline-flex items-center gap-1"><PinIcon className="w-3 h-3 text-gray-400"/>{incident.address || `${incident.latitude?.toFixed(4)}, ${incident.longitude?.toFixed(4)}`}</div>
                       <div className="mt-1.5 flex items-center gap-2">
                           <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
                             status === 'RESOLVED' ? 'bg-green-100 text-green-700' :
@@ -1093,7 +1208,7 @@ function DashboardView({ incidents = [], loading = false, emergencyMode, setEmer
                             {status || 'OPEN'}
                           </span>
                           <span className="text-[9px] text-gray-500">Sev: {severity}/5</span>
-                          {incident.assigned_to && <span className="text-[9px] text-purple-600">👤 Assigned</span>}
+                          {incident.assigned_to && <span className="text-[9px] text-purple-600 inline-flex items-center gap-1"><UserIcon className="w-3 h-3 text-purple-600"/> Assigned</span>}
                       </div>
                    </div>
                  );
@@ -1392,7 +1507,7 @@ function KanbanView({ incidents, setIncidents, filters, setFilters, refreshIncid
         {/* Column 1: OPEN */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden">
            <div className="p-3 bg-red-50 border-b border-red-100 flex justify-between items-center">
-              <h3 className="font-bold text-gray-800 text-sm">📋 OPEN REPORTS</h3>
+              <h3 className="font-bold text-gray-800 text-sm inline-flex items-center gap-2"><ClipboardIcon className="w-4 h-4 text-gray-700"/> OPEN REPORTS</h3>
               <span className="bg-white text-red-600 text-xs px-2 py-0.5 rounded border border-red-100 font-bold">{openIncidents.length}</span>
            </div>
            <div 
@@ -1514,7 +1629,7 @@ function KanbanView({ incidents, setIncidents, filters, setFilters, refreshIncid
         {/* Column 3: RESOLVED */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden">
            <div className="p-3 bg-green-50 border-b border-green-100 flex justify-between items-center">
-              <h3 className="font-bold text-gray-800 text-sm">✅ RESOLVED</h3>
+              <h3 className="font-bold text-gray-800 text-sm inline-flex items-center gap-2"><CheckIcon className="w-4 h-4 text-green-600"/> RESOLVED</h3>
               <span className="bg-white text-green-600 text-xs px-2 py-0.5 rounded border border-green-100 font-bold">{resolvedIncidents.length}</span>
            </div>
            <div 
@@ -1685,14 +1800,14 @@ function KanbanCard({ id, title, severity, location, createdAt, status, incident
       className={`bg-white border border-gray-200 rounded p-3 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing border-l-4 ${colors.border} ${colors.bg}`}
     >
       <div className="flex justify-between items-start">
-         <span className="font-bold text-sm text-gray-800 hover:text-blue-600 transition-colors flex items-center gap-1">
-           <span>{colors.emoji}</span>
-           <span>{id} {title}</span>
+         <span className="font-bold text-sm text-gray-800 hover:text-blue-600 transition-colors flex items-center gap-2">
+           <span className="flex-shrink-0">{getCatIcon(incident?.category || title)}</span>
+           <span className="truncate">{id} {title}</span>
          </span>
          <div className="text-[10px] text-gray-500 font-mono font-semibold">{timeStr} ago</div>
       </div>
       
-      <div className="text-xs text-gray-600 mt-2 truncate">📍 {location}</div>
+      <div className="text-xs text-gray-600 mt-2 truncate inline-flex items-center gap-1"><PinIcon className="w-3 h-3 text-gray-400"/>{location}</div>
       
       <div className="mt-2 flex justify-between items-center gap-1">
          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
@@ -1709,10 +1824,11 @@ function KanbanCard({ id, title, severity, location, createdAt, status, incident
                  e.stopPropagation();
                  onClick();
                }}
-               className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded hover:bg-green-200 transition-colors font-medium"
+               className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded hover:bg-green-200 transition-colors font-medium inline-flex items-center gap-1"
                title="View full details"
              >
-               👁️ View
+               <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
+               <span>View</span>
              </button>
            )}
            <button
@@ -1804,7 +1920,7 @@ function IoTView() {
   return (
     <div className="h-full flex items-center justify-center p-4">
       <div className="bg-white rounded-lg border border-gray-200 shadow-lg p-8 text-center max-w-md">
-        <div className="text-5xl mb-4">📡</div>
+        <div className="text-5xl mb-4"><IoTIcon className="w-12 h-12 text-blue-200 mx-auto"/></div>
         <h2 className="text-2xl font-bold text-gray-800 mb-3">Predictive & IoT</h2>
         <p className="text-gray-600 mb-6">Real-time sensor integration and predictive analytics platform coming soon.</p>
         <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
@@ -1911,7 +2027,7 @@ function MapView({ incidents = [], refreshIncidents, currentUser, emergencyMode,
           <div className="flex items-center justify-between lg:mb-3">
             <div className="flex items-center gap-3">
               <h2 className="font-bold text-white text-sm flex items-center gap-2">
-                🗺️ Command Center Map
+                <span className="inline-flex items-center gap-2"><MapIcon className="w-4 h-4 text-gray-600"/> Command Center Map</span>
                 <span className="text-[10px] bg-green-500 text-white px-2 py-0.5 rounded font-bold flex items-center gap-1 ml-1">
                   <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
                   LIVE
@@ -1987,7 +2103,7 @@ function MapView({ incidents = [], refreshIncidents, currentUser, emergencyMode,
                 }}
                 className="text-xs bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 shadow-sm font-medium transition"
               >
-                📊 Report
+                <span className="inline-flex items-center gap-2"><StatsIcon className="w-4 h-4 text-gray-600"/> Report</span>
               </button>
             </div>
           </div>
@@ -2049,7 +2165,7 @@ function MapView({ incidents = [], refreshIncidents, currentUser, emergencyMode,
           {/* Admin Stats Panel - Left - Hidden on mobile */}
           <div className="hidden lg:block absolute top-4 left-4 bg-slate-800/95 backdrop-blur rounded-lg shadow-lg border border-slate-700 p-3 min-w-[200px] z-40">
             <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 flex items-center justify-between">
-              <span>📊 Live Statistics</span>
+              <span className="inline-flex items-center gap-2"><StatsIcon className="w-4 h-4 text-gray-600"/> Live Statistics</span>
               <span className="text-green-400">● Online</span>
             </div>
             <div className="space-y-2">
@@ -2095,7 +2211,7 @@ function MapView({ incidents = [], refreshIncidents, currentUser, emergencyMode,
           
           {/* Ward Hotspots - Top Right - Hidden on mobile */}
           <div className="hidden lg:block absolute top-4 right-4 bg-slate-800/95 backdrop-blur rounded-lg shadow-lg border border-slate-700 p-3 min-w-[180px] z-40">
-            <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2">🎯 Hotspot Wards</div>
+            <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 inline-flex items-center gap-2"><svg className="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4l2 2" /></svg>Hotspot Wards</div>
             <div className="space-y-2">
               {topWards.map(([ward, count], idx) => (
                 <div key={ward} className="flex items-center justify-between">
@@ -2169,8 +2285,8 @@ function MapView({ incidents = [], refreshIncidents, currentUser, emergencyMode,
               </div>
               <div className="p-3 space-y-2">
                 {incidents.filter(i => i.severity >= 4 && i.status !== 'RESOLVED' && i.status !== 'CLOSED').length === 0 ? (
-                  <div className="text-center py-6 text-gray-500 text-sm">
-                    ✅ No critical alerts
+                  <div className="text-center py-6 text-gray-500 text-sm flex items-center justify-center gap-2">
+                    <CheckIcon className="w-4 h-4 text-green-600"/> <span>No critical alerts</span>
                   </div>
                 ) : (
                   incidents
@@ -2189,9 +2305,10 @@ function MapView({ incidents = [], refreshIncidents, currentUser, emergencyMode,
                           <span className="font-bold text-xs text-red-700">#{incident.id.toString().slice(-4)} {incident.category}</span>
                           <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded font-bold">SEV {incident.severity}</span>
                         </div>
-                        <div className="text-[10px] text-gray-600 mt-1 truncate">📍 {incident.address || 'Location unavailable'}</div>
-                        <div className="text-[9px] text-gray-500 mt-1">
-                          {incident.assigned_to ? '👤 Assigned' : '⚠️ Unassigned'} • {new Date(incident.created_at).toLocaleDateString()}
+                        <div className="text-[10px] text-gray-600 mt-1 truncate inline-flex items-center gap-1"><PinIcon className="w-3 h-3 text-gray-400"/>{incident.address || 'Location unavailable'}</div>
+                        <div className="text-[9px] text-gray-500 mt-1 inline-flex items-center gap-2">
+                          {incident.assigned_to ? (<span className="inline-flex items-center gap-1"><UserIcon className="w-3 h-3 text-gray-500"/> Assigned</span>) : (<span className="inline-flex items-center gap-1 text-yellow-700"><WarningIcon className="w-3 h-3 text-yellow-600"/> Unassigned</span>)}
+                          <span>• {new Date(incident.created_at).toLocaleDateString()}</span>
                         </div>
                       </div>
                     ))
@@ -2213,7 +2330,7 @@ function MapView({ incidents = [], refreshIncidents, currentUser, emergencyMode,
               <div className="p-3 space-y-2">
                 {incidents.filter(i => !i.assigned_to && i.status !== 'RESOLVED' && i.status !== 'CLOSED').length === 0 ? (
                   <div className="text-center py-6 text-gray-500 text-sm">
-                    ✅ All issues assigned
+                    <span className="inline-flex items-center gap-2"><CheckIcon className="w-4 h-4 text-green-600"/> <span>All issues assigned</span></span>
                   </div>
                 ) : (
                   incidents
@@ -2238,7 +2355,7 @@ function MapView({ incidents = [], refreshIncidents, currentUser, emergencyMode,
                             SEV {incident.severity}
                           </span>
                         </div>
-                        <div className="text-[10px] text-gray-600 mt-1 truncate">📍 {incident.address || 'Location unavailable'}</div>
+                        <div className="text-[10px] text-gray-600 mt-1 truncate inline-flex items-center gap-1"><PinIcon className="w-3 h-3 text-gray-400"/>{incident.address || 'Location unavailable'}</div>
                         <div className="text-[9px] text-gray-500 mt-1">
                           Status: {incident.status || 'OPEN'} • {new Date(incident.created_at).toLocaleDateString()}
                         </div>

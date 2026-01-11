@@ -92,7 +92,24 @@ export default function Tickets() {
     return result;
   }, [tickets, activeFilter, searchQuery]);
 
-  const catIcons = { 'Pothole': '🕳️', 'Garbage': '🗑️', 'Streetlight': '💡', 'Water Leak': '💧', 'Road Damage': '🚧', 'Other': '📍' };
+  const getCatIcon = (cat) => {
+    if (!cat) return (
+      <svg className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7z" /><circle cx="12" cy="9" r="2" fill="currentColor" /></svg>
+    );
+    const key = String(cat).trim().toLowerCase();
+    if (key.includes('pothole') || key.includes('poth')) return <svg className="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" fill="currentColor" /></svg>;
+    if (key.includes('garbage') || key.includes('trash')) return <svg className="w-5 h-5 text-purple-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6v12a2 2 0 002 2h4a2 2 0 002-2V6" /><path d="M10 6V4a2 2 0 012-2h0a2 2 0 012 2v2" /></svg>;
+    if (key.includes('streetlight') || key.includes('light')) return <svg className="w-5 h-5 text-yellow-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a4 4 0 00-4 4c0 1.657 1.343 3 3 3h2c1.657 0 3-1.343 3-3a4 4 0 00-4-4z" /><path d="M12 13v6" /><path d="M10 21h4" /></svg>;
+    if (key.includes('water') || key.includes('leak') || key.includes('supply')) return <svg className="w-5 h-5 text-cyan-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3s4 4 4 7a4 4 0 11-8 0c0-3 4-7 4-7z" /></svg>;
+    if (key.includes('road') || key.includes('damage')) return <svg className="w-5 h-5 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M3 13l4-8 4 8 4-8 4 8" /><path d="M2 20h20" /></svg>;
+    if (key.includes('drain')) return <svg className="w-5 h-5 text-teal-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16" /><path d="M8 16v-6a4 4 0 018 0v6" /></svg>;
+    if (key.includes('foot') || key.includes('path')) return <svg className="w-5 h-5 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h18" /><path d="M6 12v6a2 2 0 002 2h8a2 2 0 002-2v-6" /></svg>;
+    if (key.includes('sanitation') || key.includes('sewer')) return <svg className="w-5 h-5 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a5 5 0 00-5 5v7a5 5 0 0010 0V7a5 5 0 00-5-5z" /><path d="M9 21h6" /></svg>;
+    if (key.includes('traffic') || key.includes('signal')) return <svg className="w-5 h-5 text-pink-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="3" width="8" height="14" rx="2" /><circle cx="12" cy="7" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="17" r="1" /></svg>;
+    return (
+      <svg className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7z" /><circle cx="12" cy="9" r="2" fill="currentColor" /></svg>
+    );
+  };
   const statusColors = { 'OPEN': 'bg-orange-100 text-orange-700 border-orange-200', 'IN_PROGRESS': 'bg-blue-100 text-blue-700 border-blue-200', 'RESOLVED': 'bg-green-100 text-green-700 border-green-200', 'CLOSED': 'bg-gray-100 text-gray-600 border-gray-200' };
   const severityColors = ['bg-green-100 text-green-700', 'bg-yellow-100 text-yellow-700', 'bg-orange-100 text-orange-700', 'bg-red-100 text-red-700', 'bg-red-200 text-red-800'];
 
@@ -236,7 +253,7 @@ export default function Tickets() {
                   )}
                   <div className="p-4">
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 text-xl">{catIcons[ticket.category] || '📍'}</div>
+                      <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 text-xl">{getCatIcon(ticket.category)}</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-1 text-[11px] text-gray-500">
                           <div className="truncate">🕐 {new Date(ticket.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
@@ -255,8 +272,9 @@ export default function Tickets() {
                     </div>
                     <div className="mt-3 pt-3 border-t flex flex-wrap gap-2">
                       {ticket.address && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded text-[10px]">
-                          <span>📍</span>{ticket.address.split(',')[0]}
+                        <span className="inline-flex items-center gap-2 px-2 py-1 bg-gray-100 text-gray-600 rounded text-[10px]">
+                          <svg className="w-3 h-3 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7z" /><circle cx="12" cy="9" r="2" fill="currentColor" /></svg>
+                          <span className="truncate">{ticket.address.split(',')[0]}</span>
                         </span>
                       )}
                       <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium ${severityColors[severity - 1] || severityColors[2]}`}>

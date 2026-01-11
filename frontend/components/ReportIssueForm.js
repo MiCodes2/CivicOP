@@ -6,11 +6,15 @@ import { BENGALURU_WARDS, getZones } from '../lib/bengaluru_wards'
 const CATEGORIES = [
   { value: 'Pothole', label: 'Pothole', icon: '🕳️' },
   { value: 'Garbage', label: 'Garbage', icon: '🗑️' },
-  { value: 'Streetlight', label: 'Streetlight', icon: '💡' },
-  { value: 'Footpath', label: 'Footpath', icon: '🚶‍♀️' },
-  { value: 'Water Leak', label: 'Water Leak', icon: '💧' },
+  { value: 'Infrastructure', label: 'Infrastructure', icon: '📍' },
   { value: 'Road Damage', label: 'Road Damage', icon: '🚧' },
+  { value: 'Streetlight', label: 'Streetlight', icon: '💡' },
+  { value: 'Water Supply', label: 'Water Supply', icon: '💧' },
+  { value: 'Drainage', label: 'Drainage', icon: '🟦' },
+  { value: 'Footpath', label: 'Footpath', icon: '🚶‍♀️' },
   { value: 'Other', label: 'Other', icon: '📝' },
+  { value: 'Sanitation', label: 'Sanitation', icon: '🚽' },
+  { value: 'Traffic', label: 'Traffic', icon: '🚦' },
 ]
 
 export default function ReportIssueForm({ onClose, onSuccess, initialLocation }) {
