@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { useEffect, useState, useMemo } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // Fix for default markers in Leaflet with Next.js
@@ -15,7 +15,7 @@ if (typeof window !== 'undefined') {
     });
 }
 
-const Map = ({ incidents, userLocation, fillHeight = false, small = false, pulseColor = null }) => {
+const Map = ({ incidents, userLocation, fillHeight = false, small = false, pulseColor = null, onBoundsChange = null, enableClustering = true }) => {
   const BENGALURU_CENTER = [12.9716, 77.5946];
   const DEFAULT_ZOOM = 11;
   
@@ -107,6 +107,17 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false, pulse
         }
       }
     }, [position, map]);
+    return null;
+  }
+
+  // Capture the current leaflet map instance on mount so clustering heuristics can use it
+  function CaptureMapInstance() {
+    const map = useMap();
+    useEffect(() => {
+      if (map) {
+        try { window.__LAST_LEAFLET_MAP_INSTANCE__ = map; } catch (e) { /* ignore */ }
+      }
+    }, [map]);
     return null;
   }
 
@@ -212,6 +223,41 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false, pulse
     });
   };
 
+  // Listen to map bounds and notify parent when they change
+  function BoundsListener({ onBoundsChange }) {
+    const map = useMap();
+    useEffect(() => {
+      if (!map) return;
+      try {
+        // initial bounds emit
+        const b = map.getBounds();
+        onBoundsChange && onBoundsChange({
+          north: b.getNorth(),
+          south: b.getSouth(),
+          east: b.getEast(),
+          west: b.getWest(),
+        });
+      } catch (e) {}
+      // subscribe to moveend to emit bounds updates
+      const onMoveEnd = () => {
+        const bb = map.getBounds();
+        onBoundsChange && onBoundsChange({
+          north: bb.getNorth(),
+          south: bb.getSouth(),
+          east: bb.getEast(),
+          west: bb.getWest(),
+        });
+      };
+      map.on('moveend', onMoveEnd);
+      map.on('zoomend', onMoveEnd);
+      return () => {
+        map.off('moveend', onMoveEnd);
+        map.off('zoomend', onMoveEnd);
+      };
+    }, [map, onBoundsChange]);
+    return null;
+  }
+
   return (
     <div className={`relative ${sizeClass} w-full rounded-lg shadow-sm border border-gray-200 overflow-hidden`}>
       <MapContainer center={center} zoom={zoom} style={{ height: '100%', width: '100%' }}>
@@ -219,6 +265,8 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false, pulse
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='© OpenStreetMap contributors'
         />
+        <CaptureMapInstance />
+        {onBoundsChange && <BoundsListener onBoundsChange={onBoundsChange} />}
         
         {/* User's Current Location - Blue Pulsing Dot (like Google Maps) */}
         {userLocation_detected && (
@@ -249,107 +297,193 @@ const Map = ({ incidents, userLocation, fillHeight = false, small = false, pulse
             </Popup>
           </Marker>
         )}
-        {incidents && incidents.filter(i => Number.isFinite(i.latitude) && Number.isFinite(i.longitude)).map((incident) => {
-          const customIcon = createSeverityIcon(incident.severity || 3, incident.status);
+        {/* Render markers with optional simple grid-clustering */}
+        {(() => {
+          const points = (incidents || []).filter(i => Number.isFinite(i.latitude) && Number.isFinite(i.longitude));
+          // If clustering disabled or few points, render directly
+          const ENABLE_CLUSTER = enableClustering;
+          if (!ENABLE_CLUSTER || points.length < 150) {
+            return points.map((incident) => {
+              const customIcon = createSeverityIcon(incident.severity || 3, incident.status);
+              return (
+                <Marker
+                  key={incident.id}
+                  position={[incident.latitude, incident.longitude]}
+                  icon={customIcon}
+                >
+                  <Popup maxWidth={300}>
+                    <div className="p-3 min-w-[240px]">
+                      {/* Header with category and status */}
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <h3 className="font-bold text-sm text-gray-900 flex-1">
+                          {incident.category ? incident.category.charAt(0).toUpperCase() + incident.category.slice(1) : 'Issue'}
+                        </h3>
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                          (incident.status || '').toUpperCase() === 'OPEN' || !incident.status ? 'bg-orange-100 text-orange-800' :
+                          (incident.status || '').toUpperCase() === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
+                          (incident.status || '').toUpperCase() === 'RESOLVED' || (incident.status || '').toUpperCase() === 'CLOSED' ? 'bg-green-100 text-green-800' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {(incident.status || '').toUpperCase() === 'RESOLVED' || (incident.status || '').toUpperCase() === 'CLOSED' ? '✅ ' : ''}
+                          {(incident.status || '').toUpperCase() === 'IN_PROGRESS' ? '🔧 ' : ''}
+                          {incident.status || 'OPEN'}
+                        </span>
+                      </div>
 
-          return (
-            <Marker
-              key={incident.id}
-              position={[incident.latitude, incident.longitude]}
-              icon={customIcon}
-            >
-              <Popup maxWidth={300}>
-                <div className="p-3 min-w-[240px]">
-                  {/* Header with category and status */}
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <h3 className="font-bold text-sm text-gray-900 flex-1">
-                      {incident.category ? incident.category.charAt(0).toUpperCase() + incident.category.slice(1) : 'Issue'}
-                    </h3>
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                      (incident.status || '').toUpperCase() === 'OPEN' || !incident.status ? 'bg-orange-100 text-orange-800' :
-                      (incident.status || '').toUpperCase() === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
-                      (incident.status || '').toUpperCase() === 'RESOLVED' || (incident.status || '').toUpperCase() === 'CLOSED' ? 'bg-green-100 text-green-800' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      {(incident.status || '').toUpperCase() === 'RESOLVED' || (incident.status || '').toUpperCase() === 'CLOSED' ? '✅ ' : ''}
-                      {(incident.status || '').toUpperCase() === 'IN_PROGRESS' ? '🔧 ' : ''}
-                      {incident.status || 'OPEN'}
-                    </span>
-                  </div>
-                  
-                  {/* Description */}
-                  <p className="text-xs text-gray-700 mb-2 leading-relaxed line-clamp-3">
-                    {incident.description || 'No description provided'}
-                  </p>
-                  
-                  {/* Address and Ward */}
-                  <div className="space-y-1 mb-2 text-xs text-gray-600">
-                    {incident.address && (
-                      <div className="flex items-start gap-1">
-                        <span className="text-base mt-0.5">📍</span>
-                        <span className="line-clamp-2">{incident.address}</span>
+                      {/* Description */}
+                      <p className="text-xs text-gray-700 mb-2 leading-relaxed line-clamp-3">
+                        {incident.description || 'No description provided'}
+                      </p>
+
+                      {/* Address and Ward */}
+                      <div className="space-y-1 mb-2 text-xs text-gray-600">
+                        {incident.address && (
+                          <div className="flex items-start gap-1">
+                            <span className="text-base mt-0.5">📍</span>
+                            <span className="line-clamp-2">{incident.address}</span>
+                          </div>
+                        )}
+                        {incident.ward_number && (
+                          <div className="flex items-center gap-1">
+                            <span>🏛️</span>
+                            <span className="font-medium">{incident.ward_number}</span>
+                          </div>
+                        )}
+                        {!incident.address && (
+                          <div className="flex items-center gap-1 text-gray-500">
+                            <span>📍</span>
+                            <span className="text-xs">{incident.latitude.toFixed(4)}, {incident.longitude.toFixed(4)}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {incident.ward_number && (
-                      <div className="flex items-center gap-1">
-                        <span>🏛️</span>
-                        <span className="font-medium">{incident.ward_number}</span>
-                      </div>
-                    )}
-                    {!incident.address && (
-                      <div className="flex items-center gap-1 text-gray-500">
-                        <span>📍</span>
-                        <span className="text-xs">{incident.latitude.toFixed(4)}, {incident.longitude.toFixed(4)}</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Image if available */}
-                  {incident.image_url && (
-                    <div className="mb-2">
-                      <img 
-                        src={incident.image_url} 
-                        alt={incident.category}
-                        className="w-full h-32 object-cover rounded-lg border border-gray-200"
-                      />
-                    </div>
-                  )}
-                  
-                  {/* Severity/Status and timestamp */}
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                    {((incident.status || '').toUpperCase() === 'RESOLVED' || (incident.status || '').toUpperCase() === 'CLOSED') ? (
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs font-medium text-green-600">✅ Resolved</span>
-                      </div>
-                    ) : (incident.status || '').toUpperCase() === 'IN_PROGRESS' ? (
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs font-medium text-blue-600">🔧 In Progress</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs font-medium text-gray-600">Severity:</span>
-                        <div className="flex gap-0.5">
-                          {[...Array(5)].map((_, i) => (
-                            <div
-                              key={i}
-                              className={`w-1.5 h-1.5 rounded-full ${
-                                i < (incident.severity || 3) ? (incident.severity >= 4 ? 'bg-red-500' : incident.severity === 3 ? 'bg-orange-500' : 'bg-yellow-500') : 'bg-gray-300'
-                              }`}
-                            />
-                          ))}
+
+                      {/* Image if available */}
+                      {incident.image_url && (
+                        <div className="mb-2">
+                          <img 
+                            src={incident.image_url} 
+                            alt={incident.category}
+                            className="w-full h-32 object-cover rounded-lg border border-gray-200"
+                          />
                         </div>
-                        <span className="text-xs text-gray-600 ml-1">{incident.severity || 3}/5</span>
+                      )}
+
+                      {/* Severity/Status and timestamp */}
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                        {((incident.status || '').toUpperCase() === 'RESOLVED' || (incident.status || '').toUpperCase() === 'CLOSED') ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-medium text-green-600">✅ Resolved</span>
+                          </div>
+                        ) : (incident.status || '').toUpperCase() === 'IN_PROGRESS' ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-medium text-blue-600">🔧 In Progress</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-medium text-gray-600">Severity:</span>
+                            <div className="flex gap-0.5">
+                              {[...Array(5)].map((_, i) => (
+                                <div
+                                  key={i}
+                                  className={`w-1.5 h-1.5 rounded-full ${
+                                    i < (incident.severity || 3) ? (incident.severity >= 4 ? 'bg-red-500' : incident.severity === 3 ? 'bg-orange-500' : 'bg-yellow-500') : 'bg-gray-300'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            <span className="text-xs text-gray-600 ml-1">{incident.severity || 3}/5</span>
+                          </div>
+                        )}
+                        <span className="text-xs text-gray-500">
+                          {new Date(incident.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                        </span>
                       </div>
-                    )}
-                    <span className="text-xs text-gray-500">
-                      {new Date(incident.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
-                    </span>
-                  </div>
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            });
+          }
+
+          // Simple grid clustering for large sets: bucket by lat/lng grid based on zoom
+          try {
+            const map = window.__LAST_LEAFLET_MAP_INSTANCE__;
+            const zoomLevel = map ? map.getZoom() : 11;
+            const gridSize = Math.max(0.02, 1 / Math.pow(2, zoomLevel - 8) * 0.08);
+            const buckets = {};
+            points.forEach(p => {
+              const keyLat = Math.floor(p.latitude / gridSize);
+              const keyLng = Math.floor(p.longitude / gridSize);
+              const key = `${keyLat}_${keyLng}`;
+              if (!buckets[key]) buckets[key] = { items: [], latSum: 0, lngSum: 0 };
+              buckets[key].items.push(p);
+              buckets[key].latSum += p.latitude;
+              buckets[key].lngSum += p.longitude;
+            });
+
+            return Object.keys(buckets).map(k => {
+              const b = buckets[k];
+              if (b.items.length === 1) {
+                const incident = b.items[0];
+                const customIcon = createSeverityIcon(incident.severity || 3, incident.status);
+                return (
+                  <Marker key={incident.id} position={[incident.latitude, incident.longitude]} icon={customIcon}>
+                    <Popup maxWidth={300}><div className="p-3 min-w-[240px]">{incident.description || 'No description'}</div></Popup>
+                  </Marker>
+                );
+              }
+
+              const centroid = [b.latSum / b.items.length, b.lngSum / b.items.length];
+              const count = b.items.length;
+              const clusterIcon = L.divIcon({
+                html: `<div style="background: rgba(59,130,246,0.9); color: white; width: 44px; height: 44px; border-radius: 50%; display:flex; align-items:center; justify-content:center; font-weight:700; box-shadow:0 4px 12px rgba(0,0,0,0.25);">${count}</div>`,
+                className: 'custom-cluster-icon',
+                iconSize: [44, 44],
+                iconAnchor: [22, 22],
+              });
+
+              return (
+                <Marker
+                  key={k}
+                  position={centroid}
+                  icon={clusterIcon}
+                  eventHandlers={{ click: (e) => {
+                    const map = e.target._map;
+                    map && map.setView(centroid, map.getZoom() + 2);
+                  } }}
+                >
+                  <Popup maxWidth={300}>
+                    <div style={{ maxHeight: '220px', overflow: 'auto' }}>
+                      <div className="font-semibold mb-2">{count} reports in this area</div>
+                      {b.items.slice(0, 8).map(it => (
+                        <div key={it.id} className="text-xs text-gray-700 mb-2 border-b border-gray-100 pb-2">
+                          <div className="font-medium">{it.category || 'Issue'}</div>
+                          <div className="text-gray-500">{it.address || `${it.latitude.toFixed(3)}, ${it.longitude.toFixed(3)}`}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            });
+          } catch (err) {
+            // fallback: render raw points
+            return points.map((incident) => {
+              const customIcon = createSeverityIcon(incident.severity || 3, incident.status);
+              return (
+                <Marker
+                  key={incident.id}
+                  position={[incident.latitude, incident.longitude]}
+                  icon={customIcon}
+                >
+                  <Popup maxWidth={300}>
+                    <div className="p-3 min-w-[240px]">{incident.description || 'No description'}</div>
+                  </Popup>
+                </Marker>
+              );
+            });
+          }
+        })()}
       </MapContainer>
 
       <style jsx>{`

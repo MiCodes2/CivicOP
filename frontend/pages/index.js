@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -157,67 +157,75 @@ export default function Home() {
 
   // Fetch incidents from Supabase
   useEffect(() => {
-    fetchIncidents();
-    
-    // DISABLED: Realtime subscriptions were causing stale data issues
-    // Old cached data from the subscription would overwrite fresh fetches
-    // Using polling instead (see below)
-    
-    return () => {
-      // No cleanup needed without subscription
-    };
+    // rely on Map bounds emitter to trigger initial fetch
+    return () => {};
   }, []);
 
-  // Poll for updates every 30 seconds instead of using realtime subscriptions
-  // This prevents stale cached data from overwriting fresh fetches
+  // Poll for updates every 30 seconds; will fetch using last known bounds
+  const boundsRef = useRef(null);
+  const debounceRef = useRef(null);
   useEffect(() => {
     const pollInterval = setInterval(() => {
-      fetchIncidents();
+      if (boundsRef.current) fetchIncidentsForBounds(boundsRef.current);
     }, 30000);
-
     return () => clearInterval(pollInterval);
   }, []);
 
-  const fetchIncidents = async () => {
+  // Debounced handler called from map when bounds change
+  const handleBoundsChange = (b) => {
+    boundsRef.current = b;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      fetchIncidentsForBounds(b);
+    }, 350);
+  };
+
+  async function fetchIncidentsForBounds(bounds) {
     try {
-      // Force fresh data with cache-busting headers to get latest from primary DB
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      
-      const response = await fetch(
-        `${supabaseUrl}/rest/v1/civic_issues?select=*&order=created_at.desc&limit=100&apikey=${supabaseKey}`,
-        {
-          method: 'GET',
-          headers: {
-            'apikey': supabaseKey,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=representation',
-            'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
-            'Pragma': 'no-cache',
-          },
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
+
+      // Build Supabase REST query to filter by latitude/longitude in bbox
+      const params = [];
+      params.push('select=*');
+      params.push('order=created_at.desc');
+      // latitude between south and north
+      params.push(`latitude=gte.${bounds.south}`);
+      params.push(`latitude=lte.${bounds.north}`);
+      // longitude between west and east
+      params.push(`longitude=gte.${bounds.west}`);
+      params.push(`longitude=lte.${bounds.east}`);
+      // safety cap - avoid unbounded responses
+      params.push('limit=1000');
+
+      const url = `${supabaseUrl}/rest/v1/civic_issues?${params.join('&')}&apikey=${supabaseKey}`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          apikey: supabaseKey,
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation',
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+          Pragma: 'no-cache',
+        },
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+
       const data = await response.json();
-      
-      // Parse lat/lng as floats to ensure proper filtering in Map component
       const parsedData = (Array.isArray(data) ? data : []).map(d => ({
         ...d,
         latitude: d.latitude != null ? parseFloat(d.latitude) : null,
         longitude: d.longitude != null ? parseFloat(d.longitude) : null,
       }));
-      // Ensure incidents are sorted by created_at descending (server requests already do this, but keep client-side safeguard)
-      parsedData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      parsedData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       setIncidents(parsedData);
     } catch (error) {
-      console.error('Error fetching incidents:', error);
+      console.error('Error fetching incidents for bounds:', error);
       setIncidents([]);
     }
-  };
+  }
 
   // Get user location
   useEffect(() => {
@@ -291,7 +299,7 @@ export default function Home() {
               </div>
             </div>
             <div className="flex-1 overflow-hidden min-h-0 relative">
-              <DynamicMap incidents={incidents} userLocation={userLocation} fillHeight />
+              <DynamicMap incidents={incidents} userLocation={userLocation} fillHeight onBoundsChange={handleBoundsChange} />
               
               {/* Live Stats Overlay - Mobile only (bottom of map) */}
               <div className="md:hidden absolute bottom-3 left-3 right-3 bg-white/95 backdrop-blur rounded-lg shadow-lg p-2 z-40">
